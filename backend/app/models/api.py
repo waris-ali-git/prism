@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from app.models.lesson import Lesson
+
 
 class HealthResponse(BaseModel):
     status: Literal["ok"]
@@ -32,3 +34,20 @@ class LessonRequest(BaseModel):
         if has_topic and self.mimeType is not None:
             raise ValueError("'mimeType' must not be provided with 'topic'")
         return self
+
+
+class LessonMeta(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cached: bool
+    model: str
+    generatedAt: str
+    source: Literal["text", "image"]
+    requestId: str
+
+
+class LessonResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lesson: Lesson
+    meta: LessonMeta

@@ -1,3 +1,6 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
@@ -8,13 +11,19 @@ from app.core.versions import APP_NAME, APP_VERSION
 from app.routers.external import router as external_router
 from app.routers.health import router as health_router
 from app.routers.lesson import router as lesson_router
+from app.services.gemini import gemini_service
 
 
 def create_app(settings_override: Settings | None = None) -> FastAPI:
     settings = settings_override or get_settings()
     configure_logging(settings.LOG_LEVEL)
 
-    application = FastAPI(title=APP_NAME, version=APP_VERSION)
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        gemini_service.init_client(settings)
+        yield
+
+    application = FastAPI(title=APP_NAME, version=APP_VERSION, lifespan=lifespan)
     register_exception_handlers(application)
 
     application.add_middleware(
