@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Human Cell Demo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Noto+Nastaliq+Urdu:wght@400;600&display=swap">
+<style>
+/* Embed: <iframe src="cell-demo.html?embed=1">. Control from parent: iframe.contentWindow.postMessage({cell:"select",key:"nucleus"},"*")
+   Messages: {cell:"select",key} {cell:"cut",value:0-100} {cell:"activity",value:0-100} {cell:"tour",on:true|false} */
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#070a16;color:#fff;font-family:Manrope,system-ui,sans-serif;overflow:hidden}
+#stage{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 45%,#2a3b66 0%,#121a34 55%,#070a16 100%)}
+#view,#view canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#vig{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 160px rgba(0,0,0,.6)}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lb{position:absolute;left:0;top:0;pointer-events:auto;font:600 12px Manrope,sans-serif;color:#fff;background:rgba(10,14,30,.6);border:1px solid rgba(255,255,255,.3);padding:3px 10px;border-radius:99px;cursor:pointer;white-space:nowrap;backdrop-filter:blur(6px);transition:background .25s,color .25s}
+.lb.on{background:#fff;color:#111}
+.glass{position:absolute;background:rgba(14,18,38,.58);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:18px}
+#card{left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));width:min(470px,calc(100% - 28px));padding:14px 18px;transition:opacity .3s}
+#card h2{margin:0 0 2px;font-size:1.15rem}
+#card .ur{font-family:"Noto Nastaliq Urdu",serif;direction:rtl;text-align:right;font-size:1.02rem;line-height:2.1;margin:2px 0}
+#card p{margin:0;font-size:.85rem;color:#c9cfe6}
+#card .sz{margin-top:6px;font-size:.78rem;color:#9fb0ff}
+#ctl{top:max(14px,env(safe-area-inset-top));left:14px;padding:12px 14px;width:210px;display:grid;gap:8px;font-size:.8rem}
+#ctl label{display:flex;justify-content:space-between}
+#ctl input[type=range]{width:100%;accent-color:#b79cff}
+.row{display:flex;gap:6px}
+button.b{font:600 .78rem Manrope,sans-serif;flex:1;padding:6px 8px;border-radius:99px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;cursor:pointer}
+button.b.on{background:#fff;color:#111}
+#prog{top:max(14px,env(safe-area-inset-top));right:14px;padding:6px 14px;font-size:.8rem;font-weight:600}
+#msg{display:none;position:absolute;inset:0;align-items:center;justify-content:center;padding:24px;text-align:center;color:#cfd6f0}
+button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.embed #ctl,.embed #prog{display:none}
+@media (max-width:620px){#ctl{width:170px;padding:8px 10px}#card{width:calc(100% - 28px)}}
+
+.goog-te-gadget-simple{background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.3)!important;padding:4px 8px!important;border-radius:99px!important;font-size:12px!important;color:#fff!important;display:flex!important;align-items:center!important;cursor:pointer}
+.goog-te-gadget-simple .goog-te-menu-value span{color:#fff!important;border-left:none!important}
+.goog-te-gadget-icon{display:none!important}
+.goog-te-banner-frame{display:none!important}
+body{top:0px!important}
+.skiptranslate>iframe{display:none!important}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="view"></div><div id="vig"></div><div id="labels"></div>
+  <div class="glass" id="ctl">
+    <div id="google_translate_element" style="margin-bottom:6px"></div>
+    <label for="cu">Cutaway <output id="cuO"></output></label><input id="cu" type="range" min="0" max="100" value="55">
+    <label for="sp">Cell activity <output id="spO"></output></label><input id="sp" type="range" min="0" max="100" value="50">
+    <div class="row"><button class="b" id="tourB">Tour</button><button class="b on" id="lbB">Labels</button></div>
+  </div>
+  <div class="glass" id="prog"></div>
+  <div class="glass" id="card"></div>
+  <div id="msg">3D needs WebGL, which is turned off on this device.</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const ORG={
+mem:{n:"Plasma membrane",u:"Ø®Ù„ÙˆÛŒ Ø¬Ú¾Ù„ÛŒ Ù„Ù¾Úˆ Ú©ÛŒ Ø¯ÙˆÛØ±ÛŒ ØªÛÛ ÛÛ’ Ø¬Ùˆ Ø·Û’ Ú©Ø±ØªÛŒ ÛÛ’ Ú©Û Ú©ÛŒØ§ Ø§Ù†Ø¯Ø± Ø¢Ø¦Û’ Ø§ÙˆØ± Ú©ÛŒØ§ Ø¨Ø§ÛØ± Ø¬Ø§Ø¦Û’Û”",e:"A lipid bilayer with embedded proteins that controls what enters and leaves.",s:"About 7â€“10 nm thick"},
+nucleus:{n:"Nucleus",u:"Ù…Ø±Ú©Ø²Û Ø®Ù„ÛŒÛ’ Ú©Ø§ Ú©Ù†Ù¹Ø±ÙˆÙ„ Ø³ÛŒÙ†Ù¹Ø± ÛÛ’Û” Ø§Ø³ Ù…ÛŒÚº DNA Ú©Ø±ÙˆÙ…ÙˆØ³ÙˆÙ…Ø² Ú©ÛŒ Ø´Ú©Ù„ Ù…ÛŒÚº Ù…Ø­ÙÙˆØ¸ ÛÙˆØªØ§ ÛÛ’Û”",e:"Stores DNA as chromatin. The double envelope is perforated by nuclear pores.",s:"About 5â€“10 Âµm across"},
+mito:{n:"Mitochondria",u:"Ù…Ø§Ø¦Ù¹ÙˆÚ©Ø§Ù†ÚˆØ±ÛŒØ§ Ø®Ù„ÛŒÛ’ Ú©Û’ Ù¾Ø§ÙˆØ± ÛØ§Ø¤Ø³ ÛÛŒÚºÛ” Ø§Ù†Ø¯Ø±ÙˆÙ†ÛŒ ØªÛÛŒÚº (Ú©Ø±Ø³Ù¹ÛŒ) ATP Ø¨Ù†Ø§Ù†Û’ Ú©Ø§ Ø±Ù‚Ø¨Û Ø¨Ú‘Ú¾Ø§ØªÛŒ ÛÛŒÚºÛ”",e:"Make most of the cellâ€™s ATP. Folded inner membranes (cristae) add surface area.",s:"0.5â€“1 Âµm wide, 1â€“4 Âµm long"},
+er:{n:"Rough ER",u:"Ø§ÛŒÙ†ÚˆÙˆÙ¾Ù„Ø§Ø²Ù…Ú© Ø±ÛŒÙ¹ÛŒÚ©ÛŒÙˆÙ„Ù… Ø¬Ú¾Ù„ÛŒ Ú©ÛŒ ØªÛÙˆÚº Ú©Ø§ Ù†ÛŒÙ¹ ÙˆØ±Ú© ÛÛ’Û” Ø±Ù ER Ù¾Ø± Ø±Ø§Ø¦Ø¨ÙˆØ³ÙˆÙ…Ø² Ù¾Ø±ÙˆÙ¹ÛŒÙ† Ø¨Ù†Ø§ØªÛ’ ÛÛŒÚºÛ”",e:"Stacked membrane sheets studded with ribosomes that build proteins.",s:"Sheets about 50 nm thick"},
+golgi:{n:"Golgi apparatus",u:"Ú¯Ø§Ù„Ø¬ÛŒ Ø§Ù¾Ø±ÛŒÙ¹Ø³ Ù¾Ø±ÙˆÙ¹ÛŒÙ† Ú©Ùˆ Ù¾Ø±Ú©Ú¾ØªØ§ØŒ Ù¾ÛŒÚ© Ú©Ø±ØªØ§ Ø§ÙˆØ± ÙˆÛŒØ³ÛŒÚ©Ù„Ø² Ú©Û’ Ø°Ø±ÛŒØ¹Û’ Ø¢Ú¯Û’ Ø¨Ú¾ÛŒØ¬ØªØ§ ÛÛ’Û”",e:"Stacked cisternae that modify, sort and ship proteins in vesicles.",s:"A stack of 4â€“8 flattened sacs"},
+lyso:{n:"Lysosomes",u:"Ù„Ø§Ø¦Ø³ÙˆØ³ÙˆÙ… Ù…ÛŒÚº ÛØ§Ø¶Ù… Ø§ÛŒÙ†Ø²Ø§Ø¦Ù…Ø² ÛÙˆØªÛ’ ÛÛŒÚº Ø¬Ùˆ ÙØ§Ù„ØªÙˆ Ø§ÙˆØ± Ù¾Ø±Ø§Ù†Û’ Ø§Ø¬Ø²Ø§ Ú©Ùˆ ØªÙˆÚ‘ Ø¯ÛŒØªÛ’ ÛÛŒÚºÛ”",e:"Acidic compartments with enzymes that digest waste and worn-out parts.",s:"About 0.1â€“1.2 Âµm"},
+ribo:{n:"Ribosomes",u:"Ø±Ø§Ø¦Ø¨ÙˆØ³ÙˆÙ… Ù†ÛØ§ÛŒØª Ú†Ú¾ÙˆÙ¹ÛŒ Ù…Ø´ÛŒÙ†ÛŒÚº ÛÛŒÚº Ø¬Ùˆ RNA Ù¾Ú‘Ú¾ Ú©Ø± Ù¾Ø±ÙˆÙ¹ÛŒÙ† Ø¨Ù†Ø§ØªÛŒ ÛÛŒÚºÛ”",e:"Molecular machines that translate RNA into protein, free or on the ER.",s:"About 25 nm across"},
+cyto:{n:"Cytoskeleton",u:"Ù…Ø§Ø¦ÛŒÚ©Ø±ÙˆÙ¹ÛŒÙˆØ¨ÛŒÙˆÙ„Ø² Ø§ÙˆØ± Ø³ÛŒÙ†Ù¹Ø±ÛŒÙˆÙ„Ø² Ø®Ù„ÛŒÛ’ Ú©Ùˆ Ø´Ú©Ù„ Ø¯ÛŒØªÛ’ ÛÛŒÚº Ø§ÙˆØ± Ø§Ù† Ù¾Ø± Ú©Ø§Ø±Ú¯Ùˆ Ø¢Ú¯Û’ Ù¾ÛŒÚ†Ú¾Û’ Ø¬Ø§ØªØ§ ÛÛ’Û”",e:"Microtubules and centrioles: tracks for cargo and organizers of cell division.",s:"Microtubules about 25 nm wide"}
+};
+const KEYS=Object.keys(ORG),seen=new Set();let sel=null;
+const $=id=>document.getElementById(id),st={sp:50};
+const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
+if(/embed=1/.test(location.search))document.documentElement.classList.add("embed");
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const view=$("view");let renderer;
+try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true})}catch(e){$("msg").style.display="flex"}
+const hs=(x,y,z)=>{const n=Math.sin(x*127.1+y*311.7+z*74.7)*43758.5453;return n-Math.floor(n)};
+function vn(x,y,z){const xi=Math.floor(x),yi=Math.floor(y),zi=Math.floor(z),xf=x-xi,yf=y-yi,zf=z-zi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf),w=zf*zf*(3-2*zf),l=(a,b,t)=>a+(b-a)*t;
+ return l(l(l(hs(xi,yi,zi),hs(xi+1,yi,zi),u),l(hs(xi,yi+1,zi),hs(xi+1,yi+1,zi),u),v),l(l(hs(xi,yi,zi+1),hs(xi+1,yi,zi+1),u),l(hs(xi,yi+1,zi+1),hs(xi+1,yi+1,zi+1),u),v),w)}
+const fbm=(x,y,z)=>vn(x,y,z)*.6+vn(x*2.1,y*2.1,z*2.1)*.28+vn(x*4.3,y*4.3,z*4.3)*.12;
+function blob(g,amp,fq,sd){const p=g.attributes.position,n=g.attributes.normal;
+ for(let i=0;i<p.count;i++){const d=(fbm(p.getX(i)*fq+sd,p.getY(i)*fq+sd,p.getZ(i)*fq+sd)-.5)*amp;p.setXYZ(i,p.getX(i)+n.getX(i)*d,p.getY(i)+n.getY(i)*d,p.getZ(i)+n.getZ(i)*d)}
+ g.computeVertexNormals();return g}
+const mats={},pick=[];let bump=null;
+function mk(key,color,op,o){const m=new THREE.MeshPhysicalMaterial(Object.assign({color,roughness:.38,clearcoat:.55,clearcoatRoughness:.3,bumpMap:bump,bumpScale:1.4,transparent:true,opacity:op},o||{}));
+ m.userData.base=op;(mats[key]=mats[key]||[]).push(m);return m}
+function mesh(key,geo,mat,parent,grp){const m=new THREE.Mesh(geo,mat);m.userData.key=key;if(grp)m.userData.g=grp;if(key!=="mem")pick.push(m);(parent||scene).add(m);return m}
+const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(40,16/9,.1,100);
+const TOUR_MS=6500;
+if(renderer){
+ renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;renderer.outputEncoding=THREE.sRGBEncoding;renderer.localClippingEnabled=true;
+ view.appendChild(renderer.domElement);
+ const cn=document.createElement("canvas");cn.width=cn.height=256;const cx=cn.getContext("2d"),id=cx.createImageData(256,256);
+ for(let y=0;y<256;y++)for(let x=0;x<256;x++){const v=fbm(x*.05,y*.05,3)*255,i=(y*256+x)*4;id.data[i]=id.data[i+1]=id.data[i+2]=v;id.data[i+3]=255}
+ cx.putImageData(id,0,0);bump=new THREE.CanvasTexture(cn);bump.wrapS=bump.wrapT=THREE.MirroredRepeatWrapping;
+ // studio environment for reflections
+ const envS=new THREE.Scene(),eg=new THREE.SphereGeometry(20,24,16),ec=[];
+ for(let i=0;i<eg.attributes.position.count;i++){const t=eg.attributes.position.getY(i)/20*.5+.5;ec.push(.05+.35*t,.07+.45*t,.18+.7*t)}
+ eg.setAttribute("color",new THREE.Float32BufferAttribute(ec,3));envS.add(new THREE.Mesh(eg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide})));
+ [[8,10,6,6],[-10,4,-6,3],[0,-8,10,2]].forEach(a=>{const p=new THREE.Mesh(new THREE.PlaneGeometry(9,5),new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));p.material.color.setScalar(a[3]);p.position.set(a[0],a[1],a[2]);p.lookAt(0,0,0);envS.add(p)});
+ scene.environment=new THREE.PMREMGenerator(renderer).fromScene(envS,.04).texture;
+ scene.add(new THREE.HemisphereLight(0xbfd2ff,0x4a2a5a,.35));
+ const kl=new THREE.DirectionalLight(0xfff0e0,1.1);kl.position.set(6,8,8);scene.add(kl);
+ const rl=new THREE.DirectionalLight(0x7aa8ff,.9);rl.position.set(-8,-2,-8);scene.add(rl);
+ const D=new THREE.Object3D(),rnd=(()=>{let s=5;return()=>(s=(s*16807)%2147483647)/2147483647})();
+ // membrane, clipped for the cutaway, plus lipid-bilayer detail
+ const plane=new THREE.Plane(V(-1,0,0),2.4);
+ const mem=mesh("mem",blob(new THREE.SphereGeometry(1,96,64),.02,3,1),mk("mem",0xe9b790,.34,{side:THREE.DoubleSide,depthWrite:false,roughness:.22,clearcoat:1,clippingPlanes:[plane]}));mem.scale.set(6,5,5);
+ const LN=1600,lip=new THREE.InstancedMesh(new THREE.SphereGeometry(.05,8,6),mk("mem",0xffd9b8,.85,{clippingPlanes:[plane],roughness:.3}),LN);
+ for(let i=0;i<LN;i++){const y=1-2*(i+.5)/LN,r=Math.sqrt(1-y*y),a=i*2.39996;D.position.set(6.02*r*Math.cos(a),5.02*y,5.02*r*Math.sin(a));D.lookAt(0,0,0);D.updateMatrix();lip.setMatrixAt(i,D.matrix)}
+ scene.add(lip);
+ // nucleus: envelope, nucleolus, chromatin, pores
+ const nuc=mesh("nucleus",blob(new THREE.SphereGeometry(1.7,64,48),.1,1.5,2),mk("nucleus",0x8f86d6,.42,{depthWrite:false}));
+ mesh("nucleus",blob(new THREE.SphereGeometry(.55,32,24),.1,2,4),mk("nucleus",0x3c2f86,1),nuc).position.set(.5,.2,.6);
+ for(let i=0;i<7;i++){const p=[];for(let j=0;j<16;j++)p.push(V((rnd()-.5)*2.4,(rnd()-.5)*2.4,(rnd()-.5)*2.4).clampLength(0,1.3));
+  mesh("nucleus",new THREE.TubeGeometry(new THREE.CatmullRomCurve3(p),110,.04,6,false),mk("nucleus",0xf0b4d4,1,{emissive:0x7a2a55,emissiveIntensity:.35}),nuc)}
+ const pore=new THREE.InstancedMesh(new THREE.TorusGeometry(.1,.03,8,14),mk("nucleus",0xc9c2ff,1),90);pore.userData.key="nucleus";pick.push(pore);scene.add(pore);
+ for(let i=0;i<90;i++){const d=V(rnd()-.5,rnd()-.5,rnd()-.5).normalize();D.position.copy(d).multiplyScalar(1.72);D.lookAt(d.clone().multiplyScalar(4));D.updateMatrix();pore.setMatrixAt(i,D.matrix)}
+ // rough ER sheets with ribosomes
+ const rr=[];
+ for(let i=0;i<6;i++){const R=2.35+i*.2,g=blob(new THREE.SphereGeometry(R,56,36,.2+i*.05,3.4,.5,2.1),.14,1.7,i*3);mesh("er",g,mk("er",0x4fa6c2,.92,{side:THREE.DoubleSide,roughness:.45}));
+  if(i>=3){const p=g.attributes.position,n=g.attributes.normal;for(let j=0;j<p.count;j+=3)rr.push(V(p.getX(j)+n.getX(j)*.05,p.getY(j)+n.getY(j)*.05,p.getZ(j)+n.getZ(j)*.05))}}
+ const rg=new THREE.SphereGeometry(.05,8,6),rm=mk("ribo",0xffe9a8,1,{emissive:0x5a4a10,emissiveIntensity:.3});
+ const re=new THREE.InstancedMesh(rg,rm,rr.length);re.userData.key="ribo";pick.push(re);scene.add(re);rr.forEach((p,i)=>{D.position.copy(p);D.rotation.set(0,0,0);D.updateMatrix();re.setMatrixAt(i,D.matrix)});
+ // golgi + vesicles
+ const golgi=new THREE.Group();golgi.position.set(3.9,-.6,-1.6);golgi.rotation.set(.3,0,.6);golgi.userData.b=golgi.position.clone();scene.add(golgi);
+ for(let i=0;i<6;i++){const r=1-i*.06,m=mesh("golgi",blob(new THREE.SphereGeometry(r,40,24,0,6.283,0,1.15),.08,3,i*5),mk("golgi",0xe6c35a,.95,{side:THREE.DoubleSide}),golgi,golgi);m.scale.y=.4;m.position.y=(i-2.5)*.24}
+ const gv=[];for(let i=0;i<12;i++){const m=mesh("golgi",new THREE.SphereGeometry(.09,12,10),mk("golgi",0xf0d98a,1),golgi,golgi);m.userData.a=i*.55;m.userData.r=1.15+rnd()*.35;m.userData.h=(rnd()-.5)*.9;gv.push(m)}
+ // mitochondria with cristae
+ const mitos=[[-3.8,1.8,1.2],[-3.6,-1.9,-1.4],[.5,-3.6,2.2],[1.5,3.4,-2],[-1.2,3.2,2.6],[-4.2,.2,-2.4],[3.2,-2.8,1.6],[.2,1.2,-3.6]].map((p,i)=>{
+  const g=new THREE.Group();g.position.set(...p);g.userData.b=V(...p);g.rotation.set(i*.9,i*1.7,i*.6);scene.add(g);
+  mesh("mito",blob(new THREE.SphereGeometry(1,48,32),.07,2.2,i),mk("mito",0xe0813c,.5,{depthWrite:false,roughness:.3}),g,g).scale.set(1.25,.52,.52);
+  const pts=[];for(let j=0;j<=22;j++)pts.push(V(-1.05+j/10.5,(j%2?.2:-.2)*(.8+.2*Math.sin(j)),Math.sin(j*1.3)*.12));
+  mesh("mito",new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),140,.045,6,false),mk("mito",0xa84f1a,1,{emissive:0xff6a1a,emissiveIntensity:.4}),g,g);
+  mesh("mito",new THREE.SphereGeometry(1,32,20),mk("mito",0xc8682a,.3,{depthWrite:false}),g,g).scale.set(1.05,.34,.34);
+  return g});
+ // lysosomes
+ const lys=[[-4.2,-.6,.4],[2.4,3.4,-.5],[-1.6,-3.8,-1],[4,-1.5,1.8],[-2.8,2.6,-2.8],[.2,-1.2,-3.7]].map((p,i)=>{
+  const g=new THREE.Group();g.position.set(...p);g.userData.b=V(...p);scene.add(g);
+  mesh("lyso",blob(new THREE.SphereGeometry(.4,32,24),.06,3,i),mk("lyso",0xb7a458,.9),g,g);
+  for(let j=0;j<5;j++)mesh("lyso",new THREE.SphereGeometry(.07,8,6),mk("lyso",0x5a4a20,1),g,g).position.set((rnd()-.5)*.4,(rnd()-.5)*.4,(rnd()-.5)*.4);return g});
+ // cytoskeleton: microtubules, moving cargo, centrioles
+ const mts=[];
+ for(let i=0;i<15;i++){const d=V(rnd()-.5,(rnd()-.5)*.8,rnd()-.5).normalize(),p=[];
+  for(let j=0;j<=6;j++){const t=j/6,r=2.1+t*2.8;p.push(V(d.x*r*1.1,d.y*r*.9,d.z*r).add(V(rnd()-.5,rnd()-.5,rnd()-.5).multiplyScalar(.5*Math.sin(t*3.14))))}
+  const c=new THREE.CatmullRomCurve3(p);mts.push(c);mesh("cyto",new THREE.TubeGeometry(c,60,.035,6,false),mk("cyto",0xc4e36e,.9,{emissive:0x4a6a10,emissiveIntensity:.35}))}
+ const cargo=[];for(let i=0;i<14;i++){const m=mesh("cyto",new THREE.SphereGeometry(.11,12,10),mk("cyto",0xffb35a,1,{emissive:0xff8a2a,emissiveIntensity:.8}));m.userData.c=mts[i%mts.length];m.userData.t=rnd();m.userData.v=(rnd()>.5?1:-1)*(.03+rnd()*.03);cargo.push(m)}
+ const cen=new THREE.Group();cen.position.set(-.4,-2.1,-1.2);scene.add(cen);
+ [0,1].forEach(i=>{const m=mesh("cyto",new THREE.CylinderGeometry(.11,.11,.5,14),mk("cyto",0xd7ee9a,1),cen);if(i){m.rotation.z=Math.PI/2;m.position.set(.3,0,-.1)}});
+ // cytosol particles
+ const free=[];while(free.length<160){const p=V((rnd()*2-1)*5.3,(rnd()*2-1)*4.4,(rnd()*2-1)*4.4);if(p.length()>3.5&&(p.x/5.5)**2+(p.y/4.6)**2+(p.z/4.6)**2<1)free.push({p,ph:rnd()*6})}
+ const rf=new THREE.InstancedMesh(rg,rm,free.length);rf.userData.key="ribo";pick.push(rf);scene.add(rf);
+ // secretory vesicles ER -> Golgi -> membrane
+ const ves=[0,1,2,3,4,5].map(()=>{const m=new THREE.Mesh(new THREE.SphereGeometry(.13,16,12),new THREE.MeshPhysicalMaterial({color:0x4fa6c2,roughness:.3,clearcoat:1,emissive:0x4fa6c2,emissiveIntensity:.4}));scene.add(m);return m});
+ const A=V(2.2,0,1.6),B=V(3.9,-.4,-1.4),C2=V(5.2,-.9,-2.2);
+ // camera orbit
+ let th=1.15,ph=1.32,R0=14.5,rad=14.5,tgt=V(0,0,0),goal=V(0,0,0),drag=null,T=0,last=0,tour=false,tourT=0,tourI=0,fps=60,q=1;
+ const rc=new THREE.Raycaster(),mo=new THREE.Vector2(),pts=new Map(),el=renderer.domElement;
+ function size(){const w=view.clientWidth,h=view.clientHeight;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+ addEventListener("resize",size);size();
+ function ray(e){const r=el.getBoundingClientRect();mo.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);rc.setFromCamera(mo,cam);
+  return rc.intersectObjects(pick,false)[0]||rc.intersectObject(mem,false)[0]||null}
+ el.addEventListener("pointerdown",e=>{el.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});drag={x:e.clientX,y:e.clientY,moved:false};el.style.cursor="grabbing"});
+ el.addEventListener("pointermove",e=>{if(!pts.has(e.pointerId))return;const p=pts.get(e.pointerId);
+  if(pts.size===2){const o=[...pts.entries()].find(([k])=>k!==e.pointerId)[1];R0=Math.min(22,Math.max(5,R0*Math.hypot(p.x-o.x,p.y-o.y)/Math.hypot(e.clientX-o.x,e.clientY-o.y)));if(drag)drag.moved=true}
+  else if(drag){if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>5)drag.moved=true;if(drag.moved){th-=(e.clientX-p.x)*.006;ph=Math.min(2.8,Math.max(.4,ph-(e.clientY-p.y)*.006))}}
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY})});
+ const up=e=>{pts.delete(e.pointerId);el.style.cursor="grab";if(drag&&!drag.moved&&e.type==="pointerup"){const h=ray(e);setTour(false);if(h)choose(h.object.userData.key,h);else{sel=null;goal.set(0,0,0);ui()}}if(!pts.size)drag=null};
+ el.addEventListener("pointerup",up);el.addEventListener("pointercancel",up);
+ el.addEventListener("wheel",e=>{e.preventDefault();R0=Math.min(22,Math.max(5,R0*(1+e.deltaY*.001)))},{passive:false});
+ const anchors={mem:V(0,-5,0),nucleus:V(0,1.9,0),mito:mitos[0].position,er:V(2.2,.9,1.7),golgi:golgi.position,lyso:lys[0].position,ribo:V(-2.4,-2.6,2),cyto:mts[2].getPoint(.7)};
+ function choose(k,h){if(sel===k&&!h){sel=null;goal.set(0,0,0);ui();return}
+  sel=k;seen.add(k);const o=h&&h.object;
+  if(o&&o.userData.g)goal.copy(o.userData.g.userData.b||o.userData.g.position);else if(k==="ribo"||k==="cyto")goal.copy(h?h.point:anchors[k]);else if(k==="er")goal.set(1.5,.5,1.8);else if(k==="mito")goal.copy(mitos[0].userData.b);else if(k==="lyso")goal.copy(lys[0].userData.b);else if(k==="golgi")goal.copy(golgi.userData.b);else goal.set(0,0,0);ui()}
+ const LB={};KEYS.forEach(k=>{const b=document.createElement("button");b.className="lb";b.textContent=ORG[k].n;b.onclick=()=>{setTour(false);choose(k,null)};$("labels").appendChild(b);LB[k]=b});
+ function setTour(on){tour=on;tourT=0;$("tourB").classList.toggle("on",on);if(on){tourI=0;choose(KEYS[0],null)}}
+ $("tourB").onclick=()=>setTour(!tour);$("lbB").onclick=e=>e.currentTarget.classList.toggle("on");
+ const setCut=v=>{plane.constant=6.5-v*.075;$("cu").value=v;$("cuO").textContent=v+"%"},setSp=v=>{st.sp=v;$("sp").value=v;$("spO").textContent=v<30?"resting":v<70?"normal":"high"};
+ $("cu").oninput=e=>setCut(+e.target.value);$("sp").oninput=e=>setSp(+e.target.value);setCut(55);setSp(50);
+ addEventListener("message",e=>{const d=e.data||{};if(d.cell==="select"&&ORG[d.key]){setTour(false);choose(d.key,null)}else if(d.cell==="cut")setCut(+d.value);else if(d.cell==="activity")setSp(+d.value);else if(d.cell==="tour")setTour(!!d.on)});
+ const tmp=V(0,0,0);
+ function loop(t){requestAnimationFrame(loop);const rd=Math.min(.1,(t-last)/1000||.016),dt=Math.min(.05,rd);last=t;
+  fps+=(1/rd-fps)*.05;if(fps<28&&q>.6){q-=.1;renderer.setPixelRatio(Math.max(1,Math.min(devicePixelRatio||1,2)*q));size()}
+  const k=(.15+st.sp/60)*(reduce?.3:1),pulse=.5+.5*Math.sin(T*3);T+=dt*k;
+  if(tour){tourT+=dt*1000;if(tourT>TOUR_MS){tourT=0;tourI=(tourI+1)%KEYS.length;choose(KEYS[tourI],null)}}
+  if(!reduce&&!sel&&!drag)th+=dt*.05;
+  mitos.forEach((g,i)=>{const b=g.userData.b;g.position.set(b.x+Math.sin(T*.5+i)*.12,b.y+Math.cos(T*.6+i*2)*.12,b.z+Math.sin(T*.4+i*3)*.12);g.rotation.y+=dt*.15*k;g.children[1].material.emissiveIntensity=.15+st.sp/100*.6*pulse});
+  lys.forEach((g,i)=>{const b=g.userData.b;g.position.set(b.x,b.y+Math.sin(T*.7+i)*.12,b.z+Math.cos(T*.5+i)*.1)});
+  gv.forEach(m=>{const a=m.userData.a+T*.5;m.position.set(Math.cos(a)*m.userData.r,m.userData.h+Math.sin(T+a)*.05,Math.sin(a)*m.userData.r*.8)});
+  cargo.forEach(m=>{const u=m.userData;u.t+=u.v*dt*k*3;if(u.t>1)u.t=0;if(u.t<0)u.t=1;m.position.copy(u.c.getPoint(u.t))});
+  ves.forEach((v,i)=>{const p=(T*.04+i/6)%1;if(p<.5)v.position.lerpVectors(A,B,p*2);else v.position.lerpVectors(B,C2,p*2-1)});
+  free.forEach((f,i)=>{D.position.set(f.p.x+Math.sin(T*1.5+f.ph)*.2,f.p.y+Math.cos(T*1.2+f.ph)*.2,f.p.z+Math.sin(T+f.ph*2)*.2);D.rotation.set(0,0,0);D.updateMatrix();rf.setMatrixAt(i,D.matrix)});rf.instanceMatrix.needsUpdate=true;
+  for(const key in mats)mats[key].forEach(m=>{const g=m.userData.base*((sel&&sel!==key)?(key==="mem"?.5:.2):1);m.opacity+=(g-m.opacity)*.12});
+  tgt.lerp(goal,.07);rad+=((sel?Math.min(R0,8):R0)-rad)*.07;
+  cam.position.set(tgt.x+rad*Math.sin(ph)*Math.sin(th),tgt.y+rad*Math.cos(ph),tgt.z+rad*Math.sin(ph)*Math.cos(th));cam.lookAt(tgt);
+  renderer.render(scene,cam);
+  const w=view.clientWidth,h=view.clientHeight,show=$("lbB").classList.contains("on")&&!document.documentElement.classList.contains("embed-nolabels");
+  KEYS.forEach(k=>{const b=LB[k];tmp.copy(anchors[k]).project(cam);const ok=show&&tmp.z<1&&Math.abs(tmp.x)<1.05&&Math.abs(tmp.y)<1.05;b.style.display=ok?"block":"none";
+   if(ok){b.style.transform=`translate(${(tmp.x*.5+.5)*w}px,${(-tmp.y*.5+.5)*h}px) translate(-50%,-50%)`;b.classList.toggle("on",k===sel)}});
+ }
+ requestAnimationFrame(loop);
+}
+function ui(){
+ const o=ORG[sel];
+ $("card").innerHTML=o?`<h2>${o.n}</h2><p>${o.e}</p><p class="sz">${o.s}</p>`
+ :`<h2>Explore the cell</h2><p>Drag to rotate, scroll or pinch to zoom. Tap any structure or label to fly in, or press Tour.</p>`;
+ $("prog").textContent="Studied "+seen.size+" of "+KEYS.length}
+ui();
+</script>
+
+<script type="text/javascript">
+function googleTranslateElementInit() {
+  new google.translate.TranslateElement({pageLanguage: 'en', layout: google.translate.TranslateElement.InlineLayout.SIMPLE, autoDisplay: false}, 'google_translate_element');
+}
+</script>
+<script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

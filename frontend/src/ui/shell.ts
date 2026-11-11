@@ -269,28 +269,29 @@ export class AppShell {
     document.body.classList.toggle('workspace-locked', lockWorkspace);
     this.scrollSequence.setVisible(!lockWorkspace);
 
-    const isSolarSystem =
+    const customDemoSrc =
+      state.lesson?.topicKey === 'solar-system'
+        ? '/solar-system-demo.html'
+        : state.lesson?.topicKey === 'light-prism'
+          ? '/prism-demo.html'
+          : state.lesson?.topicKey === 'human-cell'
+            ? '/cell-demo.html'
+            : null;
+
+    const isCustomDemo =
       state.route === '/' &&
       state.explorerState === 'ready' &&
-      state.lesson?.topicKey === 'solar-system';
+      customDemoSrc !== null;
 
-    const isPrismDemo =
-      state.route === '/' &&
-      state.explorerState === 'ready' &&
-      state.lesson?.topicKey === 'light-prism';
-
-    if (isSolarSystem || isPrismDemo) {
+    if (isCustomDemo && customDemoSrc) {
       this.solarContainer.classList.remove('hidden');
       this.solarContainer.style.display = 'block';
       this.stageContainer.style.display = 'none';
       this.labelLayer.style.display = 'none';
-      const iframeSrc = isSolarSystem
-        ? '/solar-system-demo.html'
-        : '/prism-demo.html';
-      const iframeId = isSolarSystem ? 'solar-iframe' : 'prism-iframe';
+      const iframeId = `demo-iframe-${state.lesson?.topicKey}`;
       const existingIframe = this.solarContainer.querySelector('iframe');
       if (!existingIframe || existingIframe.id !== iframeId) {
-        this.solarContainer.innerHTML = `<iframe id="${iframeId}" src="${iframeSrc}" class="w-full h-full border-0 absolute inset-0 pointer-events-auto" allow="fullscreen"></iframe>`;
+        this.solarContainer.innerHTML = `<iframe id="${iframeId}" src="${customDemoSrc}" class="w-full h-full border-0 absolute inset-0 pointer-events-auto" allow="fullscreen"></iframe>`;
       }
     } else {
       this.solarContainer.classList.add('hidden');
@@ -659,10 +660,12 @@ export class AppShell {
 
     this.viewSlot.append(controlsWrap, sidePanel, this.bottomSheet.element);
 
-    if (
+    const isCustomDemo =
       lesson.topicKey === 'solar-system' ||
-      lesson.topicKey === 'light-prism'
-    ) {
+      lesson.topicKey === 'light-prism' ||
+      lesson.topicKey === 'human-cell';
+
+    if (isCustomDemo) {
       sidePanel.style.display = 'none';
       this.bottomSheet.element.style.display = 'none';
     }
@@ -706,7 +709,8 @@ export class AppShell {
 
       if (
         lesson.topicKey === 'solar-system' ||
-        lesson.topicKey === 'light-prism'
+        lesson.topicKey === 'light-prism' ||
+        lesson.topicKey === 'human-cell'
       ) {
         this.stageActionCluster.appendChild(newBtn);
         return;

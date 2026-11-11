@@ -31,12 +31,20 @@ button.b.on{background:#fff;color:#111}
 button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2px}
 .embed #ctl,.embed #spec{display:none}
 @media (max-width:700px){#spec{top:auto;bottom:auto;right:14px;left:14px;width:auto;min-width:0;top:max(228px,calc(env(safe-area-inset-top) + 214px))}#ctl{width:200px}}
+
+.goog-te-gadget-simple{background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.3)!important;padding:4px 8px!important;border-radius:99px!important;font-size:12px!important;color:#fff!important;display:flex!important;align-items:center!important;cursor:pointer}
+.goog-te-gadget-simple .goog-te-menu-value span{color:#fff!important;border-left:none!important}
+.goog-te-gadget-icon{display:none!important}
+.goog-te-banner-frame{display:none!important}
+body{top:0px!important}
+.skiptranslate>iframe{display:none!important}
 </style>
 </head>
 <body>
 <div id="stage">
   <div id="view"></div>
   <div class="glass" id="ctl">
+    <div id="google_translate_element" style="margin-bottom:6px"></div>
     <label for="inc">Angle of incidence <output id="incO"></output></label><input id="inc" type="range" min="0" max="80" step=".5" value="52">
     <label for="ap">Prism apex angle <output id="apO"></output></label><input id="ap" type="range" min="30" max="75" value="60">
     <label for="bo">Dispersion boost <output id="boO"></output></label><input id="bo" type="range" min="1" max="8" step=".5" value="3">
@@ -136,14 +144,14 @@ if(renderer){
   readout(res)}
  window.recalc=recalc;
  // ---- UI ----
- function readout(res){const r=res[NW-1],v=res[0],g=GL[S.g],sel=S.selJ>=0?res[S.selJ]:null;let t=`${g.n} Â· n â‰ˆ ${r.n.toFixed(3)} (red 700 nm) to ${v.n.toFixed(3)} (violet 400 nm)`;
-  if(r.out&&v.out)t+=`<br>Deviation: red ${r.dev.toFixed(1)}Â° Â· violet ${v.dev.toFixed(1)}Â° Â· spread ${Math.abs(v.dev-r.dev).toFixed(1)}Â°`;else t+=`<br>Total internal reflection: no light exits on one side.`;
+ function readout(res){const r=res[NW-1],v=res[0],g=GL[S.g],sel=S.selJ>=0?res[S.selJ]:null;let t=`${g.n} · n ≈ ${r.n.toFixed(3)} (red 700 nm) to ${v.n.toFixed(3)} (violet 400 nm)`;
+  if(r.out&&v.out)t+=`<br>Deviation: red ${r.dev.toFixed(1)}° · violet ${v.dev.toFixed(1)}° · spread ${Math.abs(v.dev-r.dev).toFixed(1)}°`;else t+=`<br>Total internal reflection: no light exits on one side.`;
   if(r.tir||v.tir)t+=`<br>Some colors are totally internally reflected inside the glass.`;
-  if(sel&&sel.out)t+=`<br><b>${Math.round(WL[S.selJ])} nm</b>: n = ${sel.n.toFixed(3)} Â· deviation ${sel.dev.toFixed(1)}Â°`;
+  if(sel&&sel.out)t+=`<br><b>${Math.round(WL[S.selJ])} nm</b>: n = ${sel.n.toFixed(3)} · deviation ${sel.dev.toFixed(1)}°`;
   $("rd").innerHTML=t}
- $("card").innerHTML=`<h2>Dispersion of white light</h2><div class="ur" lang="ur">Ø¬Ø¨ Ø³ÙÛŒØ¯ Ø±ÙˆØ´Ù†ÛŒ Ù¾Ø±Ø²Ù… Ø³Û’ Ú¯Ø²Ø±ØªÛŒ ÛÛ’ ØªÙˆ ÛØ± Ø±Ù†Ú¯ Ø§Ù„Ú¯ Ø²Ø§ÙˆÛŒÛ’ Ù¾Ø± Ù…Ú‘ØªØ§ ÛÛ’ØŒ Ú©ÛŒÙˆÙ†Ú©Û Ø´ÛŒØ´Û’ Ù…ÛŒÚº ÛØ± Ø±Ù†Ú¯ Ú©Ø§ Ø§Ù†Ø¹Ø·Ø§Ù Ú©Ø§ Ø§Ø´Ø§Ø±ÛŒÛ ØªÚ¾ÙˆÚ‘Ø§ Ù…Ø®ØªÙ„Ù ÛÙˆØªØ§ ÛÛ’Û” Ø¨Ù†ÙØ´ÛŒ Ø³Ø¨ Ø³Û’ Ø²ÛŒØ§Ø¯Û Ø§ÙˆØ± Ø³Ø±Ø® Ø³Ø¨ Ø³Û’ Ú©Ù… Ù…Ú‘ØªØ§ ÛÛ’Û”</div><p>Each color bends by a different amount because glass has a slightly different refractive index for each wavelength. Violet bends most, red least. At steep angles, light can be totally internally reflected.</p><div class="rd" id="rd"></div>`;
+ $("card").innerHTML=`<h2>Dispersion of white light</h2><p>When white light enters an optical prism, each color bends at a slightly different angle because glass has a wavelength-dependent refractive index. Violet bends the most, and red bends the least. At steep incident angles, total internal reflection occurs.</p><div class="rd" id="rd"></div>`;
  const bind=(id,k,fmt,sc)=>{const e=$(id),f=()=>{S[k]=+e.value*(sc||1);$(id+"O").textContent=fmt(+e.value);recalc()};e.oninput=f;return()=>{$(id+"O").textContent=fmt(+e.value)}};
- const setters={inc:bind("inc","inc",v=>v+"Â°"),ap:bind("ap","ap",v=>v+"Â°"),bo:bind("bo","bo",v=>v+"Ã—"),br:bind("br","br",v=>v+"%",.01)};
+ const setters={inc:bind("inc","inc",v=>v+"°"),ap:bind("ap","ap",v=>v+"°"),bo:bind("bo","bo",v=>v+"×"),br:bind("br","br",v=>v+"%",.01)};
  Object.values(setters).forEach(f=>f());
  Object.keys(GL).forEach(k=>{const b=document.createElement("button");b.className="b"+(k===S.g?" on":"");b.textContent=GL[k].n.split(" ")[0];b.dataset.k=k;b.onclick=()=>setGlass(k);$("gl").appendChild(b)});
  function setGlass(k){if(!GL[k])return;S.g=k;document.querySelectorAll("#gl .b").forEach(b=>b.classList.toggle("on",b.dataset.k===k));recalc()}
@@ -165,12 +173,19 @@ if(renderer){
  el.addEventListener("wheel",e=>{e.preventDefault();R0=Math.min(80,Math.max(10,R0*(1+e.deltaY*.001)))},{passive:false});
  recalc();
  function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,(t-last)/1000||.016);last=t;T+=dt;
-  if(S.sw&&!reduce){S.inc=55+20*Math.sin(T*.35);$("inc").value=S.inc;$("incO").textContent=S.inc.toFixed(0)+"Â°";recalc()}
+  if(S.sw&&!reduce){S.inc=55+20*Math.sin(T*.35);$("inc").value=S.inc;$("incO").textContent=S.inc.toFixed(0)+"°";recalc()}
   for(let i=0;i<MN;i++){const b=mb[i];mp[i*3]=b[0]+Math.sin(T*.2+b[3])*.6;mp[i*3+1]=b[1]+Math.sin(T*.3+b[3]*2)*.4;mp[i*3+2]=b[2]+Math.cos(T*.25+b[3])*.5}mg.attributes.position.needsUpdate=true;
   rad+=(R0-rad)*.08;cam.position.set(tgt.x+rad*Math.sin(ph)*Math.sin(th),tgt.y+rad*Math.cos(ph),tgt.z+rad*Math.sin(ph)*Math.cos(th));cam.lookAt(tgt);
   renderer.render(scene,cam)}
  requestAnimationFrame(loop);
 }
 </script>
+
+<script type="text/javascript">
+function googleTranslateElementInit() {
+  new google.translate.TranslateElement({pageLanguage: 'en', layout: google.translate.TranslateElement.InlineLayout.SIMPLE, autoDisplay: false}, 'google_translate_element');
+}
+</script>
+<script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </body>
 </html>

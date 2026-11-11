@@ -31,12 +31,20 @@ button.b.on{background:#fff;color:#111}
 button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2px}
 .embed #ctl{display:none}
 @media (max-width:620px){#ctl{width:160px;padding:8px 10px}}
+
+.goog-te-gadget-simple{background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.3)!important;padding:4px 8px!important;border-radius:99px!important;font-size:12px!important;color:#fff!important;display:flex!important;align-items:center!important;cursor:pointer}
+.goog-te-gadget-simple .goog-te-menu-value span{color:#fff!important;border-left:none!important}
+.goog-te-gadget-icon{display:none!important}
+.goog-te-banner-frame{display:none!important}
+body{top:0px!important}
+.skiptranslate>iframe{display:none!important}
 </style>
 </head>
 <body>
 <div id="stage">
   <div id="view"></div><div id="labels"></div>
   <div class="glass" id="ctl">
+    <div id="google_translate_element" style="margin-bottom:6px"></div>
     <label for="sp">Time speed <output id="spO"></output></label><input id="sp" type="range" min="0" max="100" value="40">
     <div class="row"><button class="b" id="tourB">Tour</button><button class="b on" id="lbB">Labels</button><button class="b on" id="orB">Orbits</button></div>
   </div>
@@ -184,10 +192,17 @@ if(renderer){
 }
 function ui(){
  const o=ORG[sel];
- $("card").innerHTML=o?`<h2>${o.n}</h2><div class="ur" lang="ur">${o.u}</div><p>${o.e}</p><p class="sz">${o.s.replace(/ · /g,"<br>")}</p>`
+ $("card").innerHTML=o?`<h2>${o.n}</h2><p>${o.e}</p><p class="sz">${o.s.replace(/ · /g,"<br>")}</p>`
  :`<h2>The Solar System</h2><p>Drag to rotate, scroll or pinch to zoom. Tap a planet or label to fly to it, or press Tour. Sizes and distances are compressed so everything fits on screen.</p>`}
 ui();
 </script>
+
+<script type="text/javascript">
+function googleTranslateElementInit() {
+  new google.translate.TranslateElement({pageLanguage: 'en', layout: google.translate.TranslateElement.InlineLayout.SIMPLE, autoDisplay: false}, 'google_translate_element');
+}
+</script>
+<script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </body>
 </html>
 

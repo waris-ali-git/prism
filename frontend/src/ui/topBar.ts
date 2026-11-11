@@ -138,7 +138,23 @@ export function renderTopBar(
 
   langWrap.append(enBtn, urBtn);
 
-  rightCluster.append(navGroup, scaleBtn, langWrap);
+  const gtHolder = document.createElement('div');
+  gtHolder.id = 'google_translate_element';
+  gtHolder.className = 'flex items-center';
+
+  rightCluster.append(navGroup, scaleBtn, langWrap, gtHolder);
+
+  if ((window as unknown as { google?: { translate?: { TranslateElement: unknown; InlineLayout?: { SIMPLE: unknown } } } }).google?.translate?.TranslateElement) {
+    try {
+      const g = (window as unknown as { google: { translate: { TranslateElement: new (cfg: unknown, id: string) => unknown; InlineLayout: { SIMPLE: unknown } } } }).google.translate;
+      new g.TranslateElement(
+        { pageLanguage: 'en', layout: g.InlineLayout.SIMPLE, autoDisplay: false },
+        'google_translate_element',
+      );
+    } catch {
+      // safe fallback
+    }
+  }
   inner.append(brandBtn, rightCluster);
   bar.appendChild(inner);
   container.appendChild(bar);
