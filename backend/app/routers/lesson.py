@@ -1,9 +1,16 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.ratelimit import extract_client_ip, lesson_rate_limiter
-from app.models.api import LessonRequest, LessonResponse
+from app.core.versions import PROMPT_VERSION, SCHEMA_VERSION
+from app.models.api import (
+    LessonRequest,
+    LessonResponse,
+    RecentLessonItem,
+    RecentLessonsResponse,
+)
+from app.services.firestore import list_recent_lessons
 from app.services.lesson_service import create_lesson_from_topic
 
 router = APIRouter(tags=["lesson"])
@@ -23,4 +30,24 @@ async def create_lesson(payload: LessonRequest, request: Request) -> LessonRespo
         code="CONFIG_MISSING",
         message="Photo-to-lesson pipeline will be wired in phase B5.",
         status=503,
+    )
+
+
+@router.get("/api/lessons", response_model=RecentLessonsResponse)
+async def get_recent_lessons(
+    limit: int = Query(default=12, ge=1, le=30),
+) -> RecentLessonsResponse:
+    version_tag = f"s{SCHEMA_VERSION}_p{PROMPT_VERSION}"
+    items = await list_recent_lessons(limit=limit, version=version_tag)
+    return RecentLessonsResponse(
+        lessons=[
+            RecentLessonItem(
+                topic=item["topic"],
+                topicKey=item["topicKey"],
+                category=item["category"],
+                title=item["title"],
+                createdAt=item["createdAt"],
+            )
+            for item in items
+        ]
     )

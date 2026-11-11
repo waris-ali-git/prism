@@ -1,8 +1,8 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models.lesson import Lesson
+from app.models.lesson import Lesson, Text
 
 
 class HealthResponse(BaseModel):
@@ -51,3 +51,19 @@ class LessonResponse(BaseModel):
 
     lesson: Lesson
     meta: LessonMeta
+
+
+class RecentLessonItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    topic: str
+    topicKey: str
+    category: str
+    title: Text
+    createdAt: str
+
+
+class RecentLessonsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lessons: list[RecentLessonItem]
