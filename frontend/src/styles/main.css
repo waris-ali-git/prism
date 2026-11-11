@@ -1,0 +1,30 @@
+@import "@fontsource-variable/nunito";
+@import "@fontsource/noto-nastaliq-urdu";
+@import "./tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #app {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  background-color: #FFFFFF;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(143, 134, 214, 0.25);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(143, 134, 214, 0.45);
+}

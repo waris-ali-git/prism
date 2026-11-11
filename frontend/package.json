@@ -1,0 +1,27 @@
+{
+  "name": "prism-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource-variable/nunito": "^5.1.0",
+    "@fontsource/noto-nastaliq-urdu": "^5.1.0",
+    "firebase": "^11.3.1",
+    "gsap": "^3.12.5",
+    "simplex-noise": "^4.0.3",
+    "three": "^0.174.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.174.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vite": "^6.2.0"
+  }
+}

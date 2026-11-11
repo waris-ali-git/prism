@@ -1,0 +1,56 @@
+:root {
+  --bg: #FFFFFF;
+  --surface-tint: #F7F6FD;
+  --ink: #2B2A3A;
+  --ink-muted: #6B6A80;
+  --ink-faint: #A5A1B8;
+  --accent: #8F86D6;
+  --accent-deep: #6E64C4;
+  --border-soft: rgba(111, 100, 196, 0.14);
+  --shadow-soft: 0 12px 40px rgba(111, 100, 196, 0.12);
+
+  /* Pastel Set */
+  --pastel-lavender: #B9B2EE;
+  --pastel-peach: #FFCDB8;
+  --pastel-mint: #B5E8D2;
+  --pastel-sky: #B8DCF5;
+  --pastel-rose: #F6BFD3;
+  --pastel-butter: #FBE9A8;
+
+  --correct: #4EBA87;
+  --wrong: #F07178;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: 'Nunito Variable', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.urdu-text {
+  font-family: 'Noto Nastaliq Urdu', serif;
+  direction: rtl;
+  line-height: 2.3;
+  font-size: 19px;
+  padding-top: 4px;
+}
+
+/* Frosted glass surface */
+.frosted-glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-soft);
+}
+
+.frosted-chip {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-soft);
+}
