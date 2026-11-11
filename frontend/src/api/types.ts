@@ -1,62 +1,51 @@
-export type Lang = "en" | "ur";
+export type Language = 'en' | 'ur';
+
+export type TextScale = 1 | 2 | 3;
 
 export interface BilingualText {
   en: string;
   ur: string;
 }
 
-export type Category =
-  | "biology"
-  | "physics"
-  | "chemistry"
-  | "earth_science"
-  | "astronomy"
-  | "math"
-  | "geography"
-  | "other";
+export type LessonCategory =
+  | 'biology'
+  | 'physics'
+  | 'chemistry'
+  | 'earth_science'
+  | 'astronomy'
+  | 'math'
+  | 'geography'
+  | 'other';
 
-export type PartShape = "sphere" | "capsule" | "disc" | "tube" | "torus" | "box";
+export type PartShape = 'sphere' | 'capsule' | 'disc' | 'tube' | 'torus' | 'box';
 
 export type PartMaterial =
-  | "membrane"
-  | "organelle"
-  | "glass"
-  | "matte"
-  | "metal"
-  | "liquid"
-  | "emissive";
+  | 'membrane'
+  | 'organelle'
+  | 'glass'
+  | 'matte'
+  | 'metal'
+  | 'liquid'
+  | 'emissive';
 
 export type MotionType =
-  | "none"
-  | "drift"
-  | "pulse"
-  | "spin"
-  | "orbit"
-  | "flow"
-  | "swing"
-  | "bob";
+  | 'none'
+  | 'drift'
+  | 'pulse'
+  | 'spin'
+  | 'orbit'
+  | 'flow'
+  | 'swing'
+  | 'bob';
 
-export type ControlEffect =
-  | "scale"
-  | "speed"
-  | "glow"
-  | "spread"
-  | "amplitude"
-  | "opacity";
-
-export interface MotionSpec {
+export interface PartMotion {
   type: MotionType;
   speed?: number;
   amplitude?: number;
   pivot?: [number, number, number];
 }
 
-export interface CameraHint {
-  position: [number, number, number];
-  target: [number, number, number];
-}
-
-export interface Part {
+export interface LessonPart {
   id: string;
   name: BilingualText;
   shape: PartShape;
@@ -70,47 +59,60 @@ export interface Part {
   path?: [number, number, number][];
   count?: number;
   spread?: number;
-  motion?: MotionSpec | null;
+  motion?: PartMotion;
   explain: BilingualText;
 }
 
-export interface Control {
+export type ControlEffect =
+  | 'scale'
+  | 'speed'
+  | 'glow'
+  | 'spread'
+  | 'amplitude'
+  | 'opacity';
+
+export interface LessonControl {
   id: string;
   label: BilingualText;
   min: number;
   max: number;
   default: number;
-  step?: number | null;
-  unit?: string | null;
+  step?: number;
+  unit?: string;
   effect: ControlEffect;
   affects: string[];
 }
 
-export interface Question {
+export interface QuizQuestion {
   q: BilingualText;
-  options: BilingualText[];
+  options: [BilingualText, BilingualText, BilingualText, BilingualText] | BilingualText[];
   answer: number;
   explain: BilingualText;
+}
+
+export interface CameraHint {
+  position: [number, number, number];
+  target: [number, number, number];
 }
 
 export interface Lesson {
   schemaVersion: number;
   topic: string;
   topicKey: string;
-  category: Category;
+  category: LessonCategory;
   title: BilingualText;
   summary: BilingualText;
-  camera?: CameraHint | null;
-  parts: Part[];
-  controls: Control[];
-  quiz: Question[];
+  camera?: CameraHint;
+  parts: LessonPart[];
+  controls: LessonControl[];
+  quiz: QuizQuestion[];
 }
 
 export interface LessonMeta {
   cached: boolean;
   model: string;
   generatedAt: string;
-  source: "text" | "image";
+  source: 'text' | 'image';
   requestId: string;
 }
 
@@ -119,17 +121,28 @@ export interface LessonResponse {
   meta: LessonMeta;
 }
 
-export interface RecentLessonItem {
+export interface LessonSummaryItem {
   topic: string;
   topicKey: string;
-  category: Category | string;
+  category: LessonCategory;
   title: BilingualText;
   createdAt: string;
 }
 
-export interface RecentLessonsResponse {
-  lessons: RecentLessonItem[];
+export interface LessonsListResponse {
+  lessons: LessonSummaryItem[];
 }
+
+export interface HealthResponse {
+  status: 'ok';
+  version: string;
+  schemaVersion: number;
+  gemini: 'configured' | 'missing';
+  firestore: 'ok' | 'error';
+  external: 'configured' | 'not_configured';
+}
+
+export type ImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
 
 export interface ResultPayload {
   topicKey: string;
@@ -139,7 +152,7 @@ export interface ResultPayload {
   nickname?: string;
 }
 
-export interface TopicStatItem {
+export interface TopicStat {
   topicKey: string;
   topic: string;
   attempts: number;
@@ -150,34 +163,33 @@ export interface TopicStatItem {
 }
 
 export interface StatsResponse {
-  topics: TopicStatItem[];
+  topics: TopicStat[];
   generatedAt: string;
 }
 
-export interface HealthResponse {
-  status: "ok";
-  version: string;
-  schemaVersion: number;
-  gemini: "configured" | "missing";
-  firestore: "ok" | "error";
-  external: "configured" | "not_configured";
+export type ApiErrorCode =
+  | 'BAD_REQUEST'
+  | 'IMAGE_TOO_LARGE'
+  | 'UNSUPPORTED_IMAGE'
+  | 'TOPIC_NOT_EDUCATIONAL'
+  | 'TOPIC_NOT_RECOGNIZED'
+  | 'VALIDATION_FAILED'
+  | 'RATE_LIMITED'
+  | 'UPSTREAM_RATE_LIMITED'
+  | 'UPSTREAM_FAILED'
+  | 'CONFIG_MISSING'
+  | 'EXTERNAL_NOT_CONFIGURED'
+  | 'EXTERNAL_FAILED'
+  | 'NOT_FOUND'
+  | 'INTERNAL'
+  | 'NETWORK_ERROR'
+  | 'ABORTED';
+
+export interface ApiErrorEnvelope {
+  error: {
+    code: ApiErrorCode;
+    message: string;
+    retryAfterSeconds?: number;
+  };
 }
 
-export type ErrorCode =
-  | "BAD_REQUEST"
-  | "IMAGE_TOO_LARGE"
-  | "UNSUPPORTED_IMAGE"
-  | "TOPIC_NOT_EDUCATIONAL"
-  | "TOPIC_NOT_RECOGNIZED"
-  | "VALIDATION_FAILED"
-  | "RATE_LIMITED"
-  | "UPSTREAM_RATE_LIMITED"
-  | "UPSTREAM_FAILED"
-  | "CONFIG_MISSING"
-  | "EXTERNAL_NOT_CONFIGURED"
-  | "EXTERNAL_FAILED"
-  | "NOT_FOUND"
-  | "INTERNAL"
-  | "INTERNAL_ERROR"
-  | "NETWORK_ERROR"
-  | "ABORTED";

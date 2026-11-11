@@ -1,0 +1,101 @@
+@import "tailwindcss";
+@import "./tokens.css";
+@import "./components.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-en);
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-en);
+  overflow-x: hidden;
+}
+
+/* Lock page scroll when interactive 3D lesson workspace is active */
+body.workspace-locked {
+  overflow: hidden;
+  height: 100dvh;
+}
+
+/* Urdu Nastaliq typography rules — Section 9.2 & F6 */
+[lang='ur'],
+.urdu-text {
+  font-family: var(--font-ur);
+  direction: rtl;
+  text-align: right;
+  line-height: 2.25;
+  font-size: max(1.125rem, 1.06em);
+  padding-top: 0.32em;
+  padding-bottom: 0.14em;
+  letter-spacing: 0;
+}
+
+.urdu-inline {
+  font-family: var(--font-ur);
+  line-height: 2.1;
+  padding-top: 0.2em;
+}
+
+/* Visible accessible keyboard focus rings — F1 & F12 */
+:focus-visible {
+  outline: 2.5px solid var(--accent-deep);
+  outline-offset: 3px;
+}
+
+/* Subtle custom scrollbars for crystal panels */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(143, 134, 214, 0.24);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(110, 100, 196, 0.42);
+}
+
+/* Cross-fade helper on language change — F6 */
+.lang-fade {
+  transition: opacity 250ms var(--ease-out-calm);
+}
+
+.lang-switching .lang-fade {
+  opacity: 0.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 120ms !important;
+  }
+}
+

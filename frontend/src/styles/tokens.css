@@ -1,15 +1,24 @@
 :root {
+  /* Core palette — CLAUDE.md Section 9.1 */
   --bg: #FFFFFF;
   --surface-tint: #F7F6FD;
   --ink: #2B2A3A;
   --ink-muted: #6B6A80;
-  --ink-faint: #A5A1B8;
   --accent: #8F86D6;
   --accent-deep: #6E64C4;
   --border-soft: rgba(111, 100, 196, 0.14);
+  --border-crystal: rgba(143, 134, 214, 0.24);
   --shadow-soft: 0 12px 40px rgba(111, 100, 196, 0.12);
+  --shadow-crystal:
+    0 18px 48px rgba(111, 100, 196, 0.11),
+    0 3px 12px rgba(111, 100, 196, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    inset 1px 0 0 rgba(255, 255, 255, 0.72);
+  --shadow-pill:
+    0 8px 24px rgba(143, 134, 214, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38);
 
-  /* Pastel Set */
+  /* Approved soft pastel spectrum — Section 9.1 */
   --pastel-lavender: #B9B2EE;
   --pastel-peach: #FFCDB8;
   --pastel-mint: #B5E8D2;
@@ -17,40 +26,47 @@
   --pastel-rose: #F6BFD3;
   --pastel-butter: #FBE9A8;
 
-  --correct: #4EBA87;
-  --wrong: #F07178;
+  /* Crystal frosted surfaces — Section 9.3 */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-strong: rgba(255, 255, 255, 0.84);
+  --glass-bg-subtle: rgba(255, 255, 255, 0.58);
+  --glass-blur: 24px;
+
+  /* Radii hierarchy — Section 9.3 */
+  --radius-sheet: 28px;
+  --radius-panel: 26px;
+  --radius-feature: 24px;
+  --radius-input: 18px;
+  --radius-option: 16px;
+  --radius-pill: 999px;
+
+  /* Typography — Section 9.2 */
+  --font-en: 'Nunito Variable', 'Nunito', system-ui, -apple-system, sans-serif;
+  --font-ur: 'Noto Nastaliq Urdu', 'Nunito Variable', serif;
+
+  /* Scale tokens (phone first: 14 / 16 / 20 / 28 px) */
+  --text-xs: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg: 1.25rem;    /* 20px */
+  --text-xl: 1.75rem;    /* 28px */
+  --panel-text-scale: 1;
+
+  /* Motion — Section 9.5 */
+  --ease-out-calm: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 220ms;
+  --dur-calm: 380ms;
+  --dur-slow: 500ms;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  background-color: var(--bg);
-  color: var(--ink);
-  font-family: 'Nunito Variable', system-ui, -apple-system, sans-serif;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
+[data-text-scale='1'] {
+  --panel-text-scale: 1;
 }
 
-.urdu-text {
-  font-family: 'Noto Nastaliq Urdu', serif;
-  direction: rtl;
-  line-height: 2.3;
-  font-size: 19px;
-  padding-top: 4px;
+[data-text-scale='2'] {
+  --panel-text-scale: 1.1;
 }
 
-/* Frosted glass surface */
-.frosted-glass {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--border-soft);
-  box-shadow: var(--shadow-soft);
+[data-text-scale='3'] {
+  --panel-text-scale: 1.22;
 }
 
-.frosted-chip {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-soft);
-}
