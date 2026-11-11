@@ -1,0 +1,30 @@
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# Firebase & Google Cloud credentials (never ignore *.json globally)
+*firebase-adminsdk*.json
+*service-account*.json
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Node / Frontend
+node_modules/
+dist/
+.firebase/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
