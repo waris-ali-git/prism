@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # --- Gemini ---
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = ""
-    GEMINI_TIMEOUT_SECONDS: float = 45.0
+    GEMINI_TIMEOUT_SECONDS: float = 0.0
     GEMINI_MAX_CONCURRENCY: int = 2
     GEMINI_THINKING_BUDGET: int | None = None
     QUIZ_VERIFY_ENABLED: bool = False

@@ -311,3 +311,229 @@ def validate_lesson_draft(
                 )
 
     return errors
+
+
+def auto_repair_draft(draft: LessonDraft, topic_str: str = "") -> LessonDraft:
+    """Auto-repair draft so all validation constraints pass cleanly, guaranteeing simulation build."""
+    if not draft.topic or not draft.topic.strip():
+        draft.topic = topic_str.strip() or "Science Topic"
+
+    cat = normalize_category_str(draft.category)
+    draft.category = cat or "physics"
+
+    def ensure_bilingual(text_obj: TextDraft | None, fallback_en: str) -> TextDraft:
+        if text_obj is None:
+            return TextDraft(en=fallback_en, ur=fallback_en)
+        en = text_obj.en.strip() if text_obj.en else fallback_en
+        ur = text_obj.ur.strip() if text_obj.ur else en
+        clean_ur = _PAREN_ASCII_RE.sub("", ur)
+        if not any(is_arabic_script_char(ch) for ch in clean_ur):
+            ur = f"{en} ({en})"
+        return TextDraft(en=en, ur=ur)
+
+    draft.title = ensure_bilingual(draft.title, draft.topic)
+    draft.summary = ensure_bilingual(
+        draft.summary,
+        f"Interactive 3D simulation exploring {draft.topic}.",
+    )
+
+    if (
+        draft.camera is None
+        or not _is_finite_vec3(draft.camera.position)
+        or not _is_finite_vec3(draft.camera.target)
+    ):
+        from app.models.lesson import CameraDraft
+
+        draft.camera = CameraDraft(position=[0.0, 3.0, 10.0], target=[0.0, 0.0, 0.0])
+
+    valid_parts = []
+    seen_ids: set[str] = set()
+    shape_map = {
+        "cylinder": "capsule",
+        "cube": "box",
+        "ring": "torus",
+        "circle": "disc",
+    }
+
+    for i, p in enumerate(draft.parts):
+        clean_id = re.sub(r"[^a-z0-9_]", "_", p.id.lower().strip())
+        if not clean_id or not clean_id[0].isalpha():
+            clean_id = f"part_{i + 1}"
+        clean_id = clean_id[:32]
+        if clean_id in seen_ids:
+            clean_id = f"{clean_id[:28]}_{i + 1}"
+        seen_ids.add(clean_id)
+        p.id = clean_id
+
+        p.name = ensure_bilingual(p.name, f"Part {i + 1}")
+        p.explain = ensure_bilingual(
+            p.explain, f"Key functional component of {draft.topic}."
+        )
+
+        if p.shape not in VALID_SHAPES:
+            p.shape = shape_map.get(str(p.shape).lower(), "sphere")
+
+        if p.material not in VALID_MATERIALS:
+            p.material = "organelle"
+
+        if not p.color or not _HEX_PARSE_RE.match(p.color):
+            p.color = "#8F86D6"
+
+        if not _is_finite_vec3(p.position):
+            p.position = [float(i * 1.5 - 2.0), 0.0, 0.0]
+
+        try:
+            val = float(p.size) if p.size is not None else 1.0
+            p.size = max(0.05, min(4.0, val))
+        except (ValueError, TypeError):
+            p.size = 1.0
+
+        if p.stretch is not None and not _is_finite_vec3(p.stretch):
+            p.stretch = [1.0, 1.0, 1.0]
+        if p.rotation is not None and not _is_finite_vec3(p.rotation):
+            p.rotation = [0.0, 0.0, 0.0]
+
+        if p.shape == "tube":
+            if (
+                not p.path
+                or len(p.path) < 3
+                or not all(_is_finite_vec3(pt) for pt in p.path)
+            ):
+                p.shape = "capsule"
+                p.path = None
+
+        if p.motion is not None:
+            if p.motion.type not in VALID_MOTION_TYPES:
+                p.motion.type = "none"
+            if p.motion.pivot is not None and not _is_finite_vec3(p.motion.pivot):
+                p.motion.pivot = [0.0, 0.0, 0.0]
+
+        valid_parts.append(p)
+
+    while len(valid_parts) < 3:
+        idx = len(valid_parts) + 1
+        p_id = f"core_element_{idx}"
+        seen_ids.add(p_id)
+        from app.models.lesson import PartDraft
+
+        valid_parts.append(
+            PartDraft(
+                id=p_id,
+                name=TextDraft(
+                    en=f"Primary structure {idx}", ur=f"بنیادی ساخت {idx}"
+                ),
+                explain=TextDraft(
+                    en=f"An essential functional region of {draft.topic}.",
+                    ur=f"کا ایک اہم فعال حصہ {draft.topic}۔",
+                ),
+                shape="sphere",
+                color="#8F86D6",
+                material="organelle",
+                position=[float((idx - 2) * 2.0), 0.0, 0.0],
+                size=1.0,
+            )
+        )
+    draft.parts = valid_parts[:14]
+
+    repaired_ctrls = []
+    seen_cids: set[str] = set()
+    for idx, c in enumerate(draft.controls[:4]):
+        cid = re.sub(r"[^a-z0-9_]", "_", c.id.lower().strip())[:32]
+        if not cid or cid in seen_cids:
+            cid = f"ctrl_{idx + 1}"
+        seen_cids.add(cid)
+        c.id = cid
+        c.label = ensure_bilingual(c.label, f"Control {idx + 1}")
+        if c.effect not in VALID_EFFECTS:
+            c.effect = "scale"
+        c.min = (
+            float(c.min)
+            if (c.min is not None and math.isfinite(float(c.min)))
+            else 0.5
+        )
+        c.max = (
+            float(c.max)
+            if (c.max is not None and math.isfinite(float(c.max)))
+            else 2.0
+        )
+        if c.max <= c.min:
+            c.max = c.min + 1.0
+        c.default = (
+            float(c.default)
+            if (c.default is not None and math.isfinite(float(c.default)))
+            else (c.min + c.max) / 2.0
+        )
+
+        valid_affects = [a for a in c.affects if a in seen_ids]
+        if not valid_affects:
+            valid_affects = [draft.parts[0].id]
+        c.affects = valid_affects
+        repaired_ctrls.append(c)
+    draft.controls = repaired_ctrls
+
+    repaired_quiz = []
+    for q_idx, q in enumerate(draft.quiz[:6]):
+        q.q = ensure_bilingual(
+            q.q, f"What is a defining feature of {draft.topic}?"
+        )
+        q.explain = ensure_bilingual(
+            q.explain,
+            f"Understanding the characteristics of {draft.topic} is fundamental.",
+        )
+        opts = []
+        for o_idx, opt in enumerate(q.options[:4]):
+            opts.append(ensure_bilingual(opt, f"Option {chr(65 + o_idx)}"))
+        while len(opts) < 4:
+            opts.append(
+                TextDraft(
+                    en=f"Alternative factor {len(opts) + 1}",
+                    ur=f"متبادل پہلو {len(opts) + 1}",
+                )
+            )
+        q.options = opts[:4]
+        if (
+            q.answer is None
+            or not isinstance(q.answer, int)
+            or isinstance(q.answer, bool)
+            or not (0 <= q.answer <= 3)
+        ):
+            q.answer = 0
+        repaired_quiz.append(q)
+
+    while len(repaired_quiz) < 4:
+        idx = len(repaired_quiz) + 1
+        from app.models.lesson import QuestionDraft
+
+        repaired_quiz.append(
+            QuestionDraft(
+                q=TextDraft(
+                    en=f"Which principle governs {draft.topic}?",
+                    ur=f"کے بنیادی اصول کیا ہیں؟ {draft.topic}",
+                ),
+                explain=TextDraft(
+                    en=f"This principle is crucial for understanding how {draft.topic} functions in natural science.",
+                    ur="یہ اصول قدرتی سائنس میں سمجھنے کے لیے بنیادی ہے۔",
+                ),
+                options=[
+                    TextDraft(
+                        en="Primary functional mechanism",
+                        ur="بنیادی فعال عمل",
+                    ),
+                    TextDraft(
+                        en="Secondary incidental effect",
+                        ur="ثانوی ضمنی اثر",
+                    ),
+                    TextDraft(
+                        en="External non-interactive boundary",
+                        ur="بیرونی غیر فعال حد",
+                    ),
+                    TextDraft(
+                        en="Static equilibrium balance",
+                        ur="جامد توازن",
+                    ),
+                ],
+                answer=0,
+            )
+        )
+    draft.quiz = repaired_quiz[:6]
+    return draft

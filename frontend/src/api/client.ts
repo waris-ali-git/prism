@@ -45,20 +45,23 @@ async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = 'GET', body, timeoutMs = 15_000, signal } = options;
+  const { method = 'GET', body, timeoutMs = 0, signal } = options;
 
   const controller = new AbortController();
   let timedOut = false;
 
-  const timer = window.setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
+  let timer: number | undefined;
+  if (timeoutMs && timeoutMs > 0) {
+    timer = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+  }
 
   const onExternalAbort = () => controller.abort();
   if (signal) {
     if (signal.aborted) {
-      window.clearTimeout(timer);
+      if (timer !== undefined) window.clearTimeout(timer);
       throw new ApiError('ABORTED', 'Request cancelled.', 0);
     }
     signal.addEventListener('abort', onExternalAbort, { once: true });
@@ -115,7 +118,9 @@ async function request<T>(
       0,
     );
   } finally {
-    window.clearTimeout(timer);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+    }
     if (signal) {
       signal.removeEventListener('abort', onExternalAbort);
     }
@@ -143,7 +148,7 @@ export function createLessonFromTopic(
   return request<LessonResponse>('/api/lesson', {
     method: 'POST',
     body: { topic: topic.trim() },
-    timeoutMs: 70_000,
+    timeoutMs: 0, // unlimited timeout
     signal,
   });
 }
@@ -156,7 +161,7 @@ export function createLessonFromImage(
   return request<LessonResponse>('/api/lesson', {
     method: 'POST',
     body: { imageBase64, mimeType },
-    timeoutMs: 70_000,
+    timeoutMs: 0, // unlimited timeout
     signal,
   });
 }

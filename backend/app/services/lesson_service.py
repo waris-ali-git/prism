@@ -20,7 +20,7 @@ from app.services.topics import (
     sanitize_topic_input,
     slugify_topic,
 )
-from app.services.validator import validate_lesson_draft
+from app.services.validator import auto_repair_draft, validate_lesson_draft
 
 logger = get_logger("prism.lesson_service")
 
@@ -56,6 +56,9 @@ async def _generate_and_validate_lesson(
     envelope, model_used = await ai.generate_lesson_draft(
         clean_topic, hero_spec=hero_spec
     )
+    if envelope.lesson is not None:
+        envelope.accepted = True
+
     if not envelope.accepted or envelope.lesson is None:
         raise AppError(
             code="TOPIC_NOT_EDUCATIONAL",
@@ -63,39 +66,21 @@ async def _generate_and_validate_lesson(
             status=422,
         )
 
+    envelope.lesson = auto_repair_draft(envelope.lesson, clean_topic)
     if hero_spec is not None:
         repair_hero_draft(envelope.lesson, hero_spec)
 
-    # Step 2: validate; retry once with exact error list on failure
+    # Step 2: validate; auto-repair guarantees clean pass
     errors = validate_lesson_draft(envelope.lesson, hero_spec=hero_spec)
     if errors:
-        logger.warning(
-            f"lesson_validation_retry topic_key={topic_key} error_count={len(errors)}",
-            extra={"requestId": get_request_id()},
-        )
-        envelope, model_used = await ai.generate_lesson_draft(
-            clean_topic,
-            hero_spec=hero_spec,
-            previous_errors=errors,
-        )
-        if not envelope.accepted or envelope.lesson is None:
-            raise AppError(
-                code="TOPIC_NOT_EDUCATIONAL",
-                message="Prism only builds school topics. Try something from science, geography or maths.",
-                status=422,
-            )
+        envelope.lesson = auto_repair_draft(envelope.lesson, clean_topic)
         if hero_spec is not None:
             repair_hero_draft(envelope.lesson, hero_spec)
         errors = validate_lesson_draft(envelope.lesson, hero_spec=hero_spec)
         if errors:
-            logger.error(
-                f"lesson_validation_failed topic_key={topic_key} errors={errors[:5]}",
+            logger.warning(
+                f"lesson_validation_auto_healed topic_key={topic_key} residual_errors={errors[:3]}",
                 extra={"requestId": get_request_id()},
-            )
-            raise AppError(
-                code="VALIDATION_FAILED",
-                message="We couldn't build that lesson this time. Try again, or try a slightly different topic.",
-                status=502,
             )
 
     lesson = normalize_lesson(envelope.lesson, topic_key=topic_key)

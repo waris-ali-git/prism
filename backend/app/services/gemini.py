@@ -251,44 +251,83 @@ class GeminiService:
             thinking_config=thinking_cfg,
         )
 
-        try:
-            response = await asyncio.wait_for(
-                client.aio.models.generate_content(
-                    model=model_name,
-                    contents=contents,
-                    config=gen_config,
-                ),
-                timeout=cfg.GEMINI_TIMEOUT_SECONDS,
-            )
-        except genai_errors.APIError as exc:
-            # Fallback if model rejects response_schema or thinking_config constraints
-            if exc.code == 400 and (
-                "schema" in str(exc).lower() or "thinking" in str(exc).lower()
-            ):
-                fallback_cfg = types.GenerateContentConfig(
-                    system_instruction=(
-                        f"{system_instruction}\n\n"
-                        f"JSON Schema:\n{json.dumps(schema.model_json_schema())}"
-                    ),
-                    temperature=temperature,
-                    max_output_tokens=max_output_tokens,
-                    response_mime_type="application/json",
-                )
-                try:
+        timeout = (
+            cfg.GEMINI_TIMEOUT_SECONDS
+            if (cfg.GEMINI_TIMEOUT_SECONDS and cfg.GEMINI_TIMEOUT_SECONDS > 0)
+            else None
+        )
+
+        candidate_models = [model_name]
+        for m in ("gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-latest"):
+            if m not in candidate_models:
+                candidate_models.append(m)
+
+        last_exc: Exception | None = None
+        for cand_model in candidate_models:
+            try:
+                if timeout is not None:
                     response = await asyncio.wait_for(
                         client.aio.models.generate_content(
-                            model=model_name,
+                            model=cand_model,
                             contents=contents,
-                            config=fallback_cfg,
+                            config=gen_config,
                         ),
-                        timeout=cfg.GEMINI_TIMEOUT_SECONDS,
+                        timeout=timeout,
                     )
-                except Exception as inner_exc:
-                    self._raise_mapped_upstream_error(inner_exc)
-            else:
-                self._raise_mapped_upstream_error(exc)
-        except Exception as exc:
-            self._raise_mapped_upstream_error(exc)
+                else:
+                    response = await client.aio.models.generate_content(
+                        model=cand_model,
+                        contents=contents,
+                        config=gen_config,
+                    )
+                last_exc = None
+                break
+            except genai_errors.APIError as exc:
+                last_exc = exc
+                if exc.code == 400 and (
+                    "schema" in str(exc).lower() or "thinking" in str(exc).lower()
+                ):
+                    fallback_cfg = types.GenerateContentConfig(
+                        system_instruction=(
+                            f"{system_instruction}\n\n"
+                            f"JSON Schema:\n{json.dumps(schema.model_json_schema())}"
+                        ),
+                        temperature=temperature,
+                        max_output_tokens=max_output_tokens,
+                        response_mime_type="application/json",
+                    )
+                    try:
+                        if timeout is not None:
+                            response = await asyncio.wait_for(
+                                client.aio.models.generate_content(
+                                    model=cand_model,
+                                    contents=contents,
+                                    config=fallback_cfg,
+                                ),
+                                timeout=timeout,
+                            )
+                        else:
+                            response = await client.aio.models.generate_content(
+                                model=cand_model,
+                                contents=contents,
+                                config=fallback_cfg,
+                            )
+                        last_exc = None
+                        break
+                    except Exception as inner_exc:
+                        last_exc = inner_exc
+                        continue
+                elif exc.code in (503, 404, 429):
+                    logger.warning(f"model_fallback_retry cand={cand_model} code={exc.code}")
+                    continue
+                else:
+                    self._raise_mapped_upstream_error(exc)
+            except Exception as exc:
+                last_exc = exc
+                continue
+
+        if last_exc is not None:
+            self._raise_mapped_upstream_error(last_exc)
 
         usage = getattr(response, "usage_metadata", None)
         if usage is not None:
