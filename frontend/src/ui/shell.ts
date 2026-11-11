@@ -18,6 +18,7 @@ import { renderLessonContent } from './lessonContent';
 import { renderPhotoModal } from './photoModal';
 import { resetQuizForLesson } from './quiz';
 import { createScrollStorySection } from './scrollStory';
+import { ScrollSequence } from './scrollSequence';
 import { renderTopBar } from './topBar';
 
 export class AppShell {
@@ -30,7 +31,9 @@ export class AppShell {
   private photoModalSlot: HTMLElement;
   private ariaLiveEl: HTMLElement;
 
-  private stage: CrystalStage;
+  private lessonStage: CrystalStage | null = null;
+  private scrollSequence: ScrollSequence;
+  private viewResizeObserver: ResizeObserver;
   private bottomSheet: DraggableBottomSheet | null = null;
   private dashboardView: TeacherDashboardView;
   private scrollStoryCleanup: (() => void) | null = null;
@@ -78,7 +81,9 @@ export class AppShell {
     this.ariaLiveEl.setAttribute('aria-live', 'polite');
     this.ariaLiveEl.setAttribute('aria-atomic', 'true');
 
+    this.scrollSequence = new ScrollSequence();
     this.root.append(
+      this.scrollSequence.element,
       this.scrollProgressEl,
       this.stageContainer,
       this.labelLayer,
@@ -87,10 +92,6 @@ export class AppShell {
       this.photoModalSlot,
       this.ariaLiveEl,
     );
-
-    this.stage = new CrystalStage(this.stageContainer, this.labelLayer, {
-      onSelectPart: (partId) => this.handleSelectPart(partId),
-    });
 
     this.dashboardView = new TeacherDashboardView(this.viewSlot, (topic) => {
       navigateTo('/');
@@ -106,10 +107,25 @@ export class AppShell {
       passive: true,
     });
 
+    window.addEventListener('resize', this.handleWindowScroll, { passive: true });
+    this.viewResizeObserver = new ResizeObserver(this.handleWindowScroll);
+    this.viewResizeObserver.observe(this.viewSlot);
+
     store.subscribe((next, prev) => this.onStateChanged(next, prev));
 
     this.renderAll(initial, null);
     this.warmUpBackend();
+  }
+
+  // The landing page uses Canvas 2D; initialize WebGL only when a lesson starts.
+  private get stage(): CrystalStage {
+    if (!this.lessonStage) {
+      this.lessonStage = new CrystalStage(this.stageContainer, this.labelLayer, {
+        onSelectPart: (partId) => this.handleSelectPart(partId),
+      });
+      this.lessonStage.setLanguage(store.getState().lang);
+    }
+    return this.lessonStage;
   }
 
   private warmUpBackend(): void {
@@ -145,7 +161,7 @@ export class AppShell {
     );
     const progress = Math.max(0, Math.min(1, window.scrollY / maxScroll));
     this.scrollProgressEl.style.width = `${(progress * 100).toFixed(1)}%`;
-    this.stage.setScrollProgress(progress);
+    this.scrollSequence.setProgress(progress);
   };
 
   private onStateChanged(next: AppState, prev: AppState): void {
@@ -154,7 +170,7 @@ export class AppShell {
     }
 
     if (next.lang !== prev.lang) {
-      this.stage.setLanguage(next.lang);
+      this.lessonStage?.setLanguage(next.lang);
     }
 
     // Re-render top bar whenever route, lang, or textScale changes
@@ -643,7 +659,11 @@ export class AppShell {
 
       this.stageActionCluster.append(newBtn, resetBtn);
 
-      if (lesson.topicKey === 'human-cell') {
+      if (
+        lesson.topicKey === 'human-cell' ||
+        lesson.topicKey === 'light-prism' ||
+        lesson.topicKey === 'solar-system'
+      ) {
         const insideBtn = document.createElement('button');
         insideBtn.type = 'button';
         insideBtn.className = `btn-primary text-xs sm:text-sm ${

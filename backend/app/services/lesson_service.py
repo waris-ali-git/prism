@@ -14,7 +14,12 @@ from app.models.lesson import Lesson
 from app.services.firestore import get_cached_lesson, save_cached_lesson
 from app.services.gemini import GeminiService, gemini_service
 from app.services.normalize import normalize_lesson
-from app.services.topics import get_hero_spec, sanitize_topic_input, slugify_topic
+from app.services.topics import (
+    get_hero_spec,
+    repair_hero_draft,
+    sanitize_topic_input,
+    slugify_topic,
+)
 from app.services.validator import validate_lesson_draft
 
 logger = get_logger("prism.lesson_service")
@@ -58,6 +63,9 @@ async def _generate_and_validate_lesson(
             status=422,
         )
 
+    if hero_spec is not None:
+        repair_hero_draft(envelope.lesson, hero_spec)
+
     # Step 2: validate; retry once with exact error list on failure
     errors = validate_lesson_draft(envelope.lesson, hero_spec=hero_spec)
     if errors:
@@ -76,6 +84,8 @@ async def _generate_and_validate_lesson(
                 message="Prism only builds school topics. Try something from science, geography or maths.",
                 status=422,
             )
+        if hero_spec is not None:
+            repair_hero_draft(envelope.lesson, hero_spec)
         errors = validate_lesson_draft(envelope.lesson, hero_spec=hero_spec)
         if errors:
             logger.error(

@@ -12,6 +12,10 @@ import type {
 import { PASTEL_PALETTE } from '../app/constants';
 import { t } from '../app/i18n';
 import { createPartGeometry, seededRandom } from './geometry';
+import {
+  buildHeroSceneIfMatch,
+  type HeroSceneController,
+} from './hero';
 import { createPartMaterial } from './materials';
 import {
   detectInitialTier,
@@ -47,6 +51,7 @@ interface PartHandle {
   ampMult: number;
   spreadMult: number;
   scaleMult: number;
+  labelOffsetY?: number;
   labelEl: HTMLButtonElement;
 }
 
@@ -75,6 +80,7 @@ export class CrystalStage {
   private ambientOrbs: AmbientOrb[] = [];
 
   private lessonGroup = new THREE.Group();
+  private activeHero: HeroSceneController | null = null;
   private selectionRing: THREE.Mesh;
   private partHandles = new Map<string, PartHandle>();
   private currentLesson: Lesson | null = null;
@@ -407,11 +413,42 @@ export class CrystalStage {
     const ny = (e.clientY / Math.max(1, window.innerHeight)) * 2 - 1;
     this.pointerTarget.x = nx;
     this.pointerTarget.y = ny;
+
+    if (this.mode === 'lesson' && e.pointerType === 'mouse') {
+      const partId = this.pickPartAtClientXY(e.clientX, e.clientY);
+      this.renderer.domElement.style.cursor = partId ? 'pointer' : 'grab';
+    }
   };
 
   private onCanvasPointerDown = (e: PointerEvent): void => {
     this.pointerDownPos = { x: e.clientX, y: e.clientY };
   };
+
+  private pickPartAtClientXY(
+    clientX: number,
+    clientY: number,
+  ): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const x = ((clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
+    const y = -((clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
+    this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
+
+    const hits = this.raycaster.intersectObjects(
+      this.lessonGroup.children,
+      true,
+    );
+    for (const hit of hits) {
+      let curr: THREE.Object3D | null = hit.object;
+      while (curr) {
+        const pid = curr.userData?.partId as string | undefined;
+        if (pid && this.partHandles.has(pid)) {
+          return pid;
+        }
+        curr = curr.parent;
+      }
+    }
+    return null;
+  }
 
   private onCanvasPointerUp = (e: PointerEvent): void => {
     if (this.mode !== 'lesson') return;
@@ -419,26 +456,8 @@ export class CrystalStage {
     const dy = e.clientY - this.pointerDownPos.y;
     if (Math.hypot(dx, dy) > 6) return;
 
-    const rect = this.renderer.domElement.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
-    const y = -((e.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
-    this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
-
-    const pickables: THREE.Object3D[] = [];
-    for (const handle of this.partHandles.values()) {
-      pickables.push(handle.mesh);
-    }
-
-    const hits = this.raycaster.intersectObjects(pickables, false);
-    const topHit = hits[0];
-    if (topHit) {
-      const partId = topHit.object.userData.partId as string | undefined;
-      if (partId) {
-        this.callbacks.onSelectPart(partId);
-        return;
-      }
-    }
-    this.callbacks.onSelectPart(null);
+    const partId = this.pickPartAtClientXY(e.clientX, e.clientY);
+    this.callbacks.onSelectPart(partId);
   };
 
   private onVisibilityChange = (): void => {
@@ -524,11 +543,100 @@ export class CrystalStage {
     this.renderer.domElement.setAttribute('aria-label', `${title}. ${summary}`);
   }
 
+  private createPillLabelButton(
+    part: LessonPart,
+    lang: Language,
+    index: number,
+  ): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'stage-pill-label';
+    if (lang === 'ur') btn.classList.add('urdu-inline');
+    btn.textContent = t(part.name, lang);
+    btn.setAttribute('lang', lang);
+    btn.setAttribute('dir', lang === 'ur' ? 'rtl' : 'ltr');
+    btn.style.opacity = '0';
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this.callbacks.onSelectPart(part.id);
+    });
+    this.labelLayer.appendChild(btn);
+
+    if (this.reducedMotion) {
+      gsap.to(btn, { opacity: 1, duration: 0.15 });
+    } else {
+      gsap.to(btn, {
+        opacity: 1,
+        duration: 0.36,
+        delay: 0.25 + index * 0.085,
+        ease: 'power2.out',
+      });
+    }
+    return btn;
+  }
+
   loadLesson(lesson: Lesson, lang: Language): void {
     this.disposeLessonObjects();
     this.currentLesson = lesson;
     this.lang = lang;
     this.selectedPartId = null;
+
+    const hero = buildHeroSceneIfMatch(lesson, this.quality);
+    if (hero) {
+      this.activeHero = hero;
+      this.lessonGroup.add(hero.root);
+
+      hero.registrations.forEach((reg, index) => {
+        const btn = this.createPillLabelButton(reg.part, lang, index);
+
+        if (!this.reducedMotion) {
+          reg.group.scale.setScalar(0.001);
+          gsap.to(reg.group.scale, {
+            x: 1,
+            y: 1,
+            z: 1,
+            duration: 0.65,
+            delay: index * 0.06,
+            ease: 'back.out(1.4)',
+          });
+        }
+
+        this.partHandles.set(reg.part.id, {
+          part: reg.part,
+          group: reg.group,
+          mesh: reg.primaryMesh,
+          material: reg.material,
+          basePosition: reg.group.position.clone(),
+          baseRotation: reg.group.rotation.clone(),
+          baseStretch: new THREE.Vector3(1, 1, 1),
+          baseEmissiveIntensity: reg.material.emissiveIntensity,
+          baseOpacity: reg.material.opacity,
+          speedMult: 1,
+          ampMult: 1,
+          spreadMult: 1,
+          scaleMult: 1,
+          labelOffsetY: reg.labelOffsetY,
+          labelEl: btn,
+        });
+      });
+
+      this.ground.position.y = -2.45;
+      this.defaultCamPos.copy(hero.cameraPreset.outsidePos);
+      this.defaultCamTarget.copy(hero.cameraPreset.outsideTarget);
+      this.controls.minDistance = 1.6;
+      this.controls.maxDistance = 15.5;
+
+      const defaultValues: Record<string, number> = {};
+      for (const ctrl of lesson.controls) {
+        defaultValues[ctrl.id] = ctrl.default;
+      }
+      this.applyControls(lesson.controls, defaultValues);
+
+      this.setMode('lesson');
+      this.resetView(true);
+      this.updateCanvasAriaLabel();
+      return;
+    }
 
     let transmissiveCount = 0;
 
@@ -622,25 +730,11 @@ export class CrystalStage {
       group.add(mesh);
       this.lessonGroup.add(group);
 
-      // DOM Pill Label — F5
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'stage-pill-label';
-      if (lang === 'ur') btn.classList.add('urdu-inline');
-      btn.textContent = t(part.name, lang);
-      btn.setAttribute('lang', lang);
-      btn.setAttribute('dir', lang === 'ur' ? 'rtl' : 'ltr');
-      btn.style.opacity = '0';
-      btn.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        this.callbacks.onSelectPart(part.id);
-      });
-      this.labelLayer.appendChild(btn);
+      const btn = this.createPillLabelButton(part, lang, index);
 
       // Single memorable staggered entrance — F11
       if (this.reducedMotion) {
         group.scale.setScalar(1);
-        gsap.to(btn, { opacity: 1, duration: 0.15 });
       } else {
         group.scale.setScalar(0.001);
         gsap.to(group.scale, {
@@ -650,12 +744,6 @@ export class CrystalStage {
           duration: 0.62,
           delay: index * 0.06,
           ease: 'back.out(1.4)',
-        });
-        gsap.to(btn, {
-          opacity: 1,
-          duration: 0.36,
-          delay: 0.25 + index * 0.085,
-          ease: 'power2.out',
         });
       }
 
@@ -708,6 +796,12 @@ export class CrystalStage {
 
     this.controls.minDistance = radius * 0.55;
     this.controls.maxDistance = radius * 3.8;
+
+    const defaultValues: Record<string, number> = {};
+    for (const ctrl of lesson.controls) {
+      defaultValues[ctrl.id] = ctrl.default;
+    }
+    this.applyControls(lesson.controls, defaultValues);
 
     this.setMode('lesson');
     this.resetView(true);
@@ -797,6 +891,31 @@ export class CrystalStage {
   }
 
   setInsideCell(inside: boolean): void {
+    if (this.activeHero) {
+      this.activeHero.setInsideMode?.(inside, this.reducedMotion);
+      if (!inside) {
+        this.resetView();
+        return;
+      }
+      const preset = this.activeHero.cameraPreset;
+      const dur = this.reducedMotion ? 0.15 : 1.05;
+      gsap.to(this.camera.position, {
+        x: preset.insidePos.x,
+        y: preset.insidePos.y,
+        z: preset.insidePos.z,
+        duration: dur,
+        ease: 'power3.inOut',
+      });
+      gsap.to(this.controls.target, {
+        x: preset.insideTarget.x,
+        y: preset.insideTarget.y,
+        z: preset.insideTarget.z,
+        duration: dur,
+        ease: 'power3.inOut',
+      });
+      return;
+    }
+
     if (!inside) {
       this.resetView();
       return;
@@ -831,6 +950,10 @@ export class CrystalStage {
   }
 
   private restoreMembraneVisibility(): void {
+    if (this.activeHero) {
+      this.activeHero.setInsideMode?.(false, this.reducedMotion);
+      return;
+    }
     const membrane = this.partHandles.get('membrane');
     if (!membrane) return;
     gsap.to(membrane.material, {
@@ -849,6 +972,10 @@ export class CrystalStage {
     controls: LessonControl[],
     values: Record<string, number>,
   ): void {
+    if (this.activeHero) {
+      this.activeHero.applyControls(controls, values);
+      return;
+    }
     // Reset target accumulators per part before applying active sliders
     const nextScale = new Map<string, number>();
     const nextSpeed = new Map<string, number>();
@@ -1074,6 +1201,26 @@ export class CrystalStage {
       this.lessonGroup.rotation.y += dt * 0.085;
     }
 
+    if (this.activeHero) {
+      this.activeHero.update(elapsed, dt, this.reducedMotion);
+
+      // Keep selection ring & camera target tracking moving/orbiting hero parts
+      if (this.selectedPartId) {
+        const selHandle = this.partHandles.get(this.selectedPartId);
+        if (selHandle) {
+          const wp = new THREE.Vector3();
+          selHandle.group.getWorldPosition(wp);
+          this.selectionRing.position.x = wp.x;
+          this.selectionRing.position.z = wp.z;
+          this.controls.target.lerp(wp, Math.min(1, dt * 4.5));
+        }
+      }
+
+      this.controls.update();
+      this.projectLabels();
+      return;
+    }
+
     // Organic motion library per part — F8.1
     let idx = 0;
     for (const handle of this.partHandles.values()) {
@@ -1188,7 +1335,8 @@ export class CrystalStage {
 
     for (const handle of ordered) {
       handle.group.getWorldPosition(worldPos);
-      worldPos.y += Math.max(0.22, handle.part.size * 0.42);
+      worldPos.y +=
+        handle.labelOffsetY ?? Math.max(0.22, handle.part.size * 0.42);
       const projected = worldPos.clone().project(this.camera);
 
       // Behind camera check
@@ -1252,11 +1400,20 @@ export class CrystalStage {
 
   disposeLessonObjects(): void {
     this.lessonGroup.rotation.set(0, 0, 0);
-    for (const handle of this.partHandles.values()) {
-      handle.mesh.geometry.dispose();
-      handle.material.dispose();
-      this.lessonGroup.remove(handle.group);
-      handle.labelEl.remove();
+    if (this.activeHero) {
+      this.activeHero.dispose();
+      this.lessonGroup.remove(this.activeHero.root);
+      this.activeHero = null;
+      for (const handle of this.partHandles.values()) {
+        handle.labelEl.remove();
+      }
+    } else {
+      for (const handle of this.partHandles.values()) {
+        handle.mesh.geometry.dispose();
+        handle.material.dispose();
+        this.lessonGroup.remove(handle.group);
+        handle.labelEl.remove();
+      }
     }
     this.partHandles.clear();
     this.selectionRing.visible = false;
