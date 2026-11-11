@@ -21,7 +21,7 @@ router = APIRouter(tags=["lesson"])
 
 @router.post("/api/lesson", response_model=LessonResponse)
 async def create_lesson(payload: LessonRequest, request: Request) -> LessonResponse:
-    settings = get_settings()
+    settings = getattr(request.app.state, "settings", None) or get_settings()
     lesson_rate_limiter.check(
         key=extract_client_ip(request),
         max_requests=settings.RATE_LIMIT_LESSON_PER_MIN,

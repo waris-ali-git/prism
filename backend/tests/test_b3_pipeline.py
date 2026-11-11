@@ -1,3 +1,4 @@
+from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.config import Settings
@@ -6,6 +7,13 @@ from app.models.lesson import LessonEnvelope
 from app.services.gemini import GeminiService
 from app.services.lesson_service import create_lesson_from_topic
 from tests.test_b2_lesson import _make_valid_draft
+
+
+@pytest.fixture(autouse=True)
+def _disable_cache() -> None:
+    with patch("app.services.lesson_service.get_cached_lesson", new_callable=AsyncMock) as m:
+        m.return_value = None
+        yield
 
 
 class _StubGemini(GeminiService):
@@ -44,11 +52,11 @@ async def test_retry_once_recovers_from_invalid_first_attempt() -> None:
             LessonEnvelope(accepted=True, reason=None, lesson=good_draft),
         ]
     )
-    res = await create_lesson_from_topic("Simple Pendulum", gemini=stub, settings=cfg)
+    res = await create_lesson_from_topic("Mock Pendulum Test Topic", gemini=stub, settings=cfg)
     assert len(stub.calls) == 2
     assert stub.calls[0][2] is None
     assert stub.calls[1][2] is not None and any("at least 3 parts" in e for e in stub.calls[1][2])
-    assert res.lesson.topicKey == "simple-pendulum"
+    assert res.lesson.topicKey == "mock-pendulum-test-topic"
     assert res.meta.cached is False
 
 

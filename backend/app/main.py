@@ -25,6 +25,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         yield
 
     application = FastAPI(title=APP_NAME, version=APP_VERSION, lifespan=lifespan)
+    application.state.settings = settings
     register_exception_handlers(application)
 
     application.add_middleware(

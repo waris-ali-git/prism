@@ -13,7 +13,7 @@ def _reset_limiters() -> None:
 
 @pytest.mark.asyncio
 async def test_health_and_request_id() -> None:
-    app = create_app(Settings(GEMINI_API_KEY="", GEMINI_MODEL=""))
+    app = create_app(Settings(GEMINI_API_KEY="", GEMINI_MODEL="", EXTERNAL_API_BASE_URL="", EXTERNAL_API_KEY=""))
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get("/api/health", headers={"X-Request-Id": "req-abc-123"})
     assert resp.status_code == 200
@@ -57,7 +57,7 @@ async def test_unknown_route_returns_not_found_6_5() -> None:
 async def test_missing_gemini_config_returns_503() -> None:
     app = create_app(Settings(GEMINI_API_KEY="", GEMINI_MODEL=""))
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        resp = await client.post("/api/lesson", json={"topic": "human cell"})
+        resp = await client.post("/api/lesson", json={"topic": "uncached new topic test"})
     assert resp.status_code == 503
     assert resp.json()["error"]["code"] == "CONFIG_MISSING"
 

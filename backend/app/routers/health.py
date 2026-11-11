@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from app.core.config import get_settings
 from app.core.versions import APP_VERSION, SCHEMA_VERSION
@@ -9,8 +9,8 @@ router = APIRouter(tags=["health"])
 
 
 @router.get("/api/health", response_model=HealthResponse)
-async def get_health() -> HealthResponse:
-    settings = get_settings()
+async def get_health(request: Request) -> HealthResponse:
+    settings = getattr(request.app.state, "settings", None) or get_settings()
     firestore_state = await check_firestore_health()
     # Normalize to literal "ok" | "error"
     fs_status = "ok" if firestore_state == "ok" else "error"
