@@ -25,3 +25,4 @@ export function buildHeroSceneIfMatch(
 }
 
 export type { HeroSceneController, HeroPartRegistration } from './types';
+

@@ -260,6 +260,10 @@ export class AppShell {
       state.route === '/' &&
       (state.explorerState === 'ready' || state.explorerState === 'loading');
     document.body.classList.toggle('workspace-locked', lockWorkspace);
+    this.scrollSequence.setVisible(!lockWorkspace);
+    this.stageContainer.style.visibility = lockWorkspace ? 'visible' : 'hidden';
+    this.lessonStage?.setActive(lockWorkspace);
+    if (!lockWorkspace) this.labelLayer.style.display = 'none';
 
     // Stage interactivity only in ready state
     const interactiveStage =
@@ -275,8 +279,7 @@ export class AppShell {
 
     if (state.route === '/teacher') {
       this.scrollProgressEl.style.width = '0%';
-      this.stage.setMode('ambient');
-      this.stage.setScrollProgress(0.15);
+      this.scrollSequence.setProgress(0);
       this.dashboardView.mount(state.lang);
       return;
     }
@@ -284,7 +287,6 @@ export class AppShell {
     // Explorer route `#/`
     switch (state.explorerState) {
       case 'idle':
-        this.stage.setMode('ambient');
         this.renderIdleExplorer(state);
         this.handleWindowScroll();
         break;
@@ -299,7 +301,7 @@ export class AppShell {
       case 'error':
         this.scrollProgressEl.style.width = '0%';
         window.scrollTo({ top: 0 });
-        this.stage.setMode('ambient');
+        this.scrollSequence.setProgress(0);
         this.renderErrorScreen(state);
         break;
 
@@ -318,21 +320,21 @@ export class AppShell {
     const isUr = lang === 'ur';
 
     const wrapper = document.createElement('div');
-    wrapper.className = 'lang-fade';
+    wrapper.className = 'lang-fade sequence-landing';
 
-    // Above-the-fold Hero Viewport
+    // Keep the prism visible between the heading and topic form.
     const heroSection = document.createElement('section');
     heroSection.className =
-      'min-h-dvh flex flex-col justify-between px-4 sm:px-8 pt-24 pb-8 max-w-4xl mx-auto';
+      'sequence-hero min-h-dvh flex flex-col justify-between px-4 sm:px-8 pt-24 pb-8 max-w-4xl mx-auto';
 
     const topSpacer = document.createElement('div');
     topSpacer.className = 'h-2';
 
     const centerStack = document.createElement('div');
-    centerStack.className = 'my-auto space-y-7 text-center';
+    centerStack.className = 'sequence-hero__content text-center';
 
     const titleWrap = document.createElement('div');
-    titleWrap.className = 'space-y-3.5 max-w-2xl mx-auto';
+    titleWrap.className = 'sequence-hero__heading space-y-3.5 max-w-2xl mx-auto';
 
     const h1 = document.createElement('h1');
     h1.className = `text-3xl sm:text-4xl md:text-[2.75rem] font-extrabold text-[#2B2A3A] tracking-tight ${

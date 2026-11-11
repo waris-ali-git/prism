@@ -89,7 +89,7 @@ export class CrystalStage {
 
   private mode: 'ambient' | 'loading' | 'lesson' = 'ambient';
   private modeBlend = { loading: 0 };
-  private scrollProgress = 0;
+  private active = true;
   private pointerTarget = { x: 0, y: 0 };
   private pointerSmoothed = { x: 0, y: 0 };
 
@@ -461,12 +461,28 @@ export class CrystalStage {
   };
 
   private onVisibilityChange = (): void => {
-    if (document.hidden) {
-      this.clock.stop();
-    } else {
-      this.clock.start();
-    }
+    this.updateRendering();
   };
+
+  setActive(active: boolean): void {
+    if (this.active === active) return;
+    this.active = active;
+    this.updateRendering();
+  }
+
+  private updateRendering(): void {
+    window.cancelAnimationFrame(this.rafId);
+    this.rafId = 0;
+    if (this.disposed || !this.active || document.hidden) {
+      this.clock.stop();
+      return;
+    }
+    const elapsed = this.clock.elapsedTime;
+    this.clock.start();
+    this.clock.elapsedTime = elapsed;
+    this.slowFrameTimer = 0;
+    this.startLoop();
+  }
 
   setMode(nextMode: 'ambient' | 'loading' | 'lesson'): void {
     this.mode = nextMode;
@@ -513,10 +529,6 @@ export class CrystalStage {
       this.lessonGroup.visible = true;
       this.labelLayer.style.display = 'block';
     }
-  }
-
-  setScrollProgress(progress: number): void {
-    this.scrollProgress = Math.max(0, Math.min(1, progress));
   }
 
   setLanguage(lang: Language): void {
@@ -1084,10 +1096,13 @@ export class CrystalStage {
   }
 
   private startLoop(): void {
+    if (this.disposed || !this.active || document.hidden) return;
     const tick = () => {
-      if (this.disposed) return;
+      if (this.disposed || !this.active || document.hidden) {
+        this.rafId = 0;
+        return;
+      }
       this.rafId = window.requestAnimationFrame(tick);
-      if (document.hidden) return;
 
       const dt = Math.min(0.1, this.clock.getDelta());
       const elapsed = this.clock.elapsedTime;
@@ -1127,8 +1142,6 @@ export class CrystalStage {
       (this.pointerTarget.y - this.pointerSmoothed.y) * lerpRate;
 
     const loadMix = this.modeBlend.loading;
-    const scrollRot = this.scrollProgress * Math.PI * 0.85;
-    const scrollLift = this.scrollProgress * 0.9;
 
     if (this.crystalMesh && this.innerFacetMesh) {
       if (this.reducedMotion) {
@@ -1137,14 +1150,11 @@ export class CrystalStage {
       } else {
         const spinSpeed = THREE.MathUtils.lerp(0.18, 0.72, loadMix);
         this.crystalMesh.rotation.y =
-          0.58 + elapsed * spinSpeed + scrollRot + this.pointerSmoothed.x * 0.28;
+          0.58 + elapsed * spinSpeed + this.pointerSmoothed.x * 0.28;
         this.crystalMesh.rotation.x =
-          0.32 +
-          Math.sin(elapsed * 0.45) * 0.09 -
-          this.pointerSmoothed.y * 0.18 +
-          this.scrollProgress * 0.35;
+          0.32 + Math.sin(elapsed * 0.45) * 0.09 - this.pointerSmoothed.y * 0.18;
         this.crystalMesh.position.y =
-          0.35 + Math.sin(elapsed * 0.7) * 0.09 + scrollLift * 0.35;
+          0.35 + Math.sin(elapsed * 0.7) * 0.09;
 
         this.innerFacetMesh.position.copy(this.crystalMesh.position);
         this.innerFacetMesh.rotation.y = -elapsed * (spinSpeed * 1.4);
@@ -1161,19 +1171,17 @@ export class CrystalStage {
         continue;
       }
 
-      // Idle gentle drift position with scroll parallax
+      // Idle gentle drift position
       const nx = this.noise(elapsed * 0.22 + i * 3.1, 0, 0) * 0.24;
       const ny = this.noise(0, elapsed * 0.24 + i * 3.1, 0) * 0.22;
       const nz = this.noise(0, 0, elapsed * 0.2 + i * 3.1) * 0.18;
 
-      const scrollSpread = 1 + this.scrollProgress * 0.28;
       const idleX =
-        orb.basePos.x * scrollSpread + nx + this.pointerSmoothed.x * 0.18;
+        orb.basePos.x + nx + this.pointerSmoothed.x * 0.18;
       const idleY =
         orb.basePos.y +
         ny -
-        this.pointerSmoothed.y * 0.14 +
-        this.scrollProgress * (i % 2 === 0 ? 0.45 : -0.25);
+        this.pointerSmoothed.y * -0.14;
       const idleZ = orb.basePos.z + nz;
 
       // Loading converging orbital dance position — F11
@@ -1191,7 +1199,7 @@ export class CrystalStage {
       );
     }
 
-    this.camera.lookAt(0, 0.2 + scrollLift * 0.18, 0);
+    this.camera.lookAt(0, 0.2, 0);
   }
 
   private updateLessonScene(elapsed: number, dt: number): void {

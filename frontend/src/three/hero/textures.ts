@@ -343,3 +343,4 @@ export function createSaturnRingTexture(): THREE.CanvasTexture {
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
+

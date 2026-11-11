@@ -34,3 +34,4 @@ export type HeroBuilderFn = (
   lesson: Lesson,
   quality: QualityConfig,
 ) => HeroSceneController;
+
