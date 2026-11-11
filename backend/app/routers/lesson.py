@@ -11,7 +11,10 @@ from app.models.api import (
     RecentLessonsResponse,
 )
 from app.services.firestore import list_recent_lessons
-from app.services.lesson_service import create_lesson_from_topic
+from app.services.lesson_service import (
+    create_lesson_from_image,
+    create_lesson_from_topic,
+)
 
 router = APIRouter(tags=["lesson"])
 
@@ -26,10 +29,17 @@ async def create_lesson(payload: LessonRequest, request: Request) -> LessonRespo
     if payload.topic is not None:
         return await create_lesson_from_topic(payload.topic, settings=settings)
 
+    if payload.imageBase64 is not None:
+        return await create_lesson_from_image(
+            payload.imageBase64,
+            payload.mimeType,
+            settings=settings,
+        )
+
     raise AppError(
-        code="CONFIG_MISSING",
-        message="Photo-to-lesson pipeline will be wired in phase B5.",
-        status=503,
+        code="BAD_REQUEST",
+        message="Provide either 'topic' or 'imageBase64'.",
+        status=400,
     )
 
 

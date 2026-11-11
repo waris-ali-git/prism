@@ -20,11 +20,20 @@ logger = get_logger("prism.gemini")
 
 _PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
 _LESSON_SYSTEM_PROMPT = (_PROMPTS_DIR / "lesson_system.md").read_text(encoding="utf-8").strip()
+_IMAGE_IDENTIFY_PROMPT = (_PROMPTS_DIR / "image_identify.md").read_text(encoding="utf-8").strip()
 _RETRY_DELAY_RE = re.compile(r"(\d+(?:\.\d+)?)s")
 
 
 class QuizVerifyResponse(BaseModel):
     answers: list[int] = Field(default_factory=list)
+
+
+class ImageIdentifyDraft(BaseModel):
+    recognized: bool = False
+    isEducational: bool = False
+    topic: str = ""
+    category: str = "other"
+    confidence: float = 0.0
 
 
 class GeminiService:
@@ -163,6 +172,33 @@ class GeminiService:
         except Exception:
             logger.warning("quiz_verify_skipped", extra={"requestId": get_request_id()})
         return lesson
+
+    async def identify_image_topic(
+        self,
+        image_bytes: bytes,
+        mime_type: str,
+    ) -> tuple[ImageIdentifyDraft, str]:
+        cfg = self._current_settings()
+        client = self._get_client(cfg)
+        model_name = cfg.GEMINI_MODEL.strip()
+
+        contents = [
+            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+            "Identify the single main school topic taught on this textbook page.",
+        ]
+
+        raw_text = await self._call_json_model(
+            client=client,
+            cfg=cfg,
+            model_name=model_name,
+            system_instruction=_IMAGE_IDENTIFY_PROMPT,
+            contents=contents,
+            schema=ImageIdentifyDraft,
+            temperature=0.2,
+            max_output_tokens=512,
+        )
+        result = ImageIdentifyDraft.model_validate_json(raw_text)
+        return result, model_name
 
     async def _call_json_model(
         self,

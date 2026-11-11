@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 from datetime import datetime, timezone
 from typing import Any
 
@@ -189,4 +190,98 @@ async def create_lesson_from_topic(
             source=source,
             requestId=get_request_id(),
         ),
+    )
+
+
+def validate_and_decode_image(
+    image_b64: str,
+    mime_type: str | None,
+    max_bytes: int,
+) -> tuple[bytes, str]:
+    if not mime_type or mime_type not in ("image/jpeg", "image/png", "image/webp"):
+        raise AppError(
+            code="UNSUPPORTED_IMAGE",
+            message="That photo can't be used. Choose a JPEG, PNG or WebP image.",
+            status=415,
+        )
+
+    # Strip data: prefix if present
+    if "," in image_b64:
+        image_b64 = image_b64.split(",", 1)[1]
+
+    try:
+        data = base64.b64decode(image_b64.strip(), validate=True)
+    except Exception:
+        raise AppError(
+            code="UNSUPPORTED_IMAGE",
+            message="That photo can't be used. Choose a JPEG, PNG or WebP image.",
+            status=415,
+        )
+
+    if len(data) > max_bytes:
+        raise AppError(
+            code="IMAGE_TOO_LARGE",
+            message=f"Image size exceeds the maximum limit of {max_bytes // 1_000_000} MB.",
+            status=413,
+        )
+
+    # File signature (magic bytes) verification
+    if mime_type == "image/jpeg":
+        if not (len(data) >= 3 and data[:3] == b"\xff\xd8\xff"):
+            raise AppError(
+                code="UNSUPPORTED_IMAGE",
+                message="That photo can't be used. Choose a JPEG, PNG or WebP image.",
+                status=415,
+            )
+    elif mime_type == "image/png":
+        if not (len(data) >= 4 and data[:4] == b"\x89PNG"):
+            raise AppError(
+                code="UNSUPPORTED_IMAGE",
+                message="That photo can't be used. Choose a JPEG, PNG or WebP image.",
+                status=415,
+            )
+    elif mime_type == "image/webp":
+        if not (len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP"):
+            raise AppError(
+                code="UNSUPPORTED_IMAGE",
+                message="That photo can't be used. Choose a JPEG, PNG or WebP image.",
+                status=415,
+            )
+
+    return data, mime_type
+
+
+async def create_lesson_from_image(
+    image_b64: str,
+    mime_type: str | None,
+    *,
+    gemini: GeminiService | None = None,
+    settings: Settings | None = None,
+) -> LessonResponse:
+    cfg = settings or get_settings()
+    data, valid_mime = validate_and_decode_image(image_b64, mime_type, cfg.MAX_IMAGE_BYTES)
+
+    ai = gemini or gemini_service
+    identify_res, _ = await ai.identify_image_topic(data, valid_mime)
+
+    if not identify_res.recognized or not identify_res.topic.strip():
+        raise AppError(
+            code="TOPIC_NOT_RECOGNIZED",
+            message="We couldn't find a topic on that page. Try a clearer photo of one textbook page.",
+            status=422,
+        )
+
+    if not identify_res.isEducational:
+        raise AppError(
+            code="TOPIC_NOT_EDUCATIONAL",
+            message="Prism only builds school topics. Try something from science, geography or maths.",
+            status=422,
+        )
+
+    # Hand off to standard text lesson pipeline with source="image"
+    return await create_lesson_from_topic(
+        identify_res.topic.strip(),
+        source="image",
+        gemini=ai,
+        settings=cfg,
     )
