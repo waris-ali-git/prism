@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.lesson import Lesson, Text
 
@@ -67,3 +67,51 @@ class RecentLessonsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     lessons: list[RecentLessonItem]
+
+
+class ResultRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    topicKey: str
+    topic: str
+    score: int
+    total: int
+    nickname: str | None = None
+
+    @field_validator("total")
+    @classmethod
+    def _validate_total(cls, v: int) -> int:
+        if not (1 <= v <= 20):
+            raise ValueError("total must be between 1 and 20")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_score(self) -> "ResultRequest":
+        if not (0 <= self.score <= self.total):
+            raise ValueError("score must be between 0 and total")
+        return self
+
+
+class ResultResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool = True
+
+
+class TopicStatItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    topicKey: str
+    topic: str
+    attempts: int
+    totalScore: int
+    totalPossible: int
+    avgPercent: float
+    updatedAt: str
+
+
+class StatsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    topics: list[TopicStatItem]
+    generatedAt: str

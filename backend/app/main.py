@@ -11,6 +11,7 @@ from app.core.versions import APP_NAME, APP_VERSION
 from app.routers.external import router as external_router
 from app.routers.health import router as health_router
 from app.routers.lesson import router as lesson_router
+from app.routers.stats import router as stats_router
 from app.services.gemini import gemini_service
 
 
@@ -39,6 +40,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
 
     application.include_router(health_router)
     application.include_router(lesson_router)
+    application.include_router(stats_router)
     application.include_router(external_router)
     return application
 

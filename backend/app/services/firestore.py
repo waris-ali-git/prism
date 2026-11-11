@@ -206,3 +206,102 @@ async def check_topic_has_lesson(topic_key: str) -> bool:
             return False
 
     return await asyncio.to_thread(_check)
+
+
+async def record_quiz_result(
+    topic_key: str,
+    topic: str,
+    score: int,
+    total: int,
+    nickname: str | None,
+    prefix: str = "dev_",
+) -> bool | None:
+    """Record a quiz attempt and update topic stats atomically.
+    Returns True on success, False if topicKey does not exist in lessons, None if firestore failed."""
+    has_lesson = await check_topic_has_lesson(topic_key)
+    if not has_lesson:
+        return False
+
+    def _batch_write() -> bool:
+        db = get_firestore_client()
+        if db is None:
+            return False
+        try:
+            now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            batch = db.batch()
+
+            # 1. Add document to {prefix}results
+            result_ref = db.collection(f"{prefix}results").document()
+            result_data: dict[str, Any] = {
+                "topicKey": topic_key,
+                "topic": topic,
+                "score": score,
+                "total": total,
+                "createdAt": now_iso,
+            }
+            if nickname:
+                result_data["nickname"] = nickname
+            batch.set(result_ref, result_data)
+
+            # 2. Increment stats on {prefix}topic_stats/{topicKey}
+            stats_ref = db.collection(f"{prefix}topic_stats").document(topic_key)
+            stats_data = {
+                "topicKey": topic_key,
+                "topic": topic,
+                "updatedAt": now_iso,
+                "attempts": firestore.Increment(1),
+                "totalScore": firestore.Increment(score),
+                "totalPossible": firestore.Increment(total),
+            }
+            batch.set(stats_ref, stats_data, merge=True)
+
+            batch.commit()
+            return True
+        except Exception as exc:
+            logger.error("Failed to record quiz result for '%s': %s", topic_key, exc)
+            return False
+
+    res = await asyncio.to_thread(_batch_write)
+    return True if res else None
+
+
+async def get_topic_stats(prefix: str = "dev_") -> list[dict[str, Any]]:
+    """Retrieve all topic stats, calculate avgPercent, and sort ascending (weakest first)."""
+    def _read() -> list[dict[str, Any]]:
+        db = get_firestore_client()
+        if db is None:
+            return []
+        try:
+            docs = db.collection(f"{prefix}topic_stats").stream()
+            results = []
+            for doc in docs:
+                data = doc.to_dict()
+                attempts = int(data.get("attempts", 0))
+                total_score = int(data.get("totalScore", 0))
+                total_possible = int(data.get("totalPossible", 0))
+                avg_percent = (
+                    round((total_score / total_possible) * 100, 1)
+                    if total_possible > 0
+                    else 0.0
+                )
+                results.append(
+                    {
+                        "topicKey": data.get("topicKey", doc.id),
+                        "topic": data.get("topic", doc.id),
+                        "attempts": attempts,
+                        "totalScore": total_score,
+                        "totalPossible": total_possible,
+                        "avgPercent": avg_percent,
+                        "updatedAt": data.get("updatedAt", ""),
+                    }
+                )
+
+            # Sort by avgPercent ascending (weakest first)
+            results.sort(key=lambda x: x["avgPercent"])
+            return results
+        except Exception as exc:
+            logger.error("Failed to read topic stats: %s", exc)
+            return []
+
+    return await asyncio.to_thread(_read)
+
