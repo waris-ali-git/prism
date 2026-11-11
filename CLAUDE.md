@@ -2,7 +2,7 @@
 
 > Source of truth for this repository. Read it fully before touching any code.
 > If code and this file disagree, this file wins until Laiba changes it.
-> "Curio" is a placeholder name. Keep it in one constant (`APP_NAME`) so it can be swapped in one place.
+> "Curio" was the initial placeholder name; final product name approved by Laiba is **Prism** (`APP_NAME = "Prism"`). Keep it in one constant (`APP_NAME`) so it stays unified everywhere.
 
 ---
 
@@ -373,13 +373,15 @@ Shape notes (the renderer is the authority; Gemini is told the same in the promp
 
 `topics.py` normalizes a topic: Unicode NFKC, lowercase, trim, collapse spaces, strip punctuation, then slugify.
 
-Aliases (only for hero topics; extend only with Laiba's approval):
+Aliases (only for hero topics; extend only with Laiba's approval — 3 hero simulations approved):
 
 | alias (normalized) | topicKey |
 |---|---|
 | cell, human cell, animal cell, cell structure, structure of a cell, structure of cell, eukaryotic cell | `human-cell` |
+| prism, light prism, dispersion of light, light dispersion, refraction through prism, refraction through a prism, glass prism, optical prism, white light spectrum | `light-prism` |
+| solar system, the solar system, planets, planetary system, planets of solar system, sun and planets, orbital motion | `solar-system` |
 
-**Hero topic `human-cell`:** the frontend has a hand-built renderer for it (F8). To make it work, the backend prompt **must** add this requirement when `topicKey == "human-cell"`: use **exactly** these part ids, in this order, and no others.
+**Hero topic 1 — `human-cell`:** the frontend has a hand-built renderer for it (F8). When `topicKey == "human-cell"`, the backend prompt requires **exactly** these part ids, in this order, and no others:
 
 | id | name (en) | notes for the explanation |
 |---|---|---|
@@ -393,7 +395,17 @@ Aliases (only for hero topics; extend only with Laiba's approval):
 | ribosomes | Ribosomes | build proteins |
 | vesicles | Vesicles | small carriers moving material |
 
-It must also include a control with id `energy` (effect `glow`, affects `mitochondria`). Position, size and color from Gemini are still validated but the hero renderer overrides the visuals.
+It must also include a control with id `energy` (effect `glow`, affects `mitochondria`).
+
+**Hero topic 2 — `light-prism`:** bespoke optics & dispersion renderer (F8). Required part ids in order:
+`glass_prism`, `incident_beam`, `refracted_beam`, `red_ray`, `green_ray`, `violet_ray`, `projection_screen`.
+Required control: id `dispersion` (effect `spread`, affects `["red_ray", "green_ray", "violet_ray"]`).
+
+**Hero topic 3 — `solar-system`:** bespoke orbital mechanics renderer (F8). Required part ids in order:
+`sun`, `mercury`, `venus`, `earth`, `mars`, `asteroid_belt`, `jupiter`, `saturn`, `saturn_rings`, `neptune`.
+Required control: id `orbital_speed` (effect `speed`, affects `["mercury", "venus", "earth", "mars", "jupiter", "saturn", "neptune"]`).
+
+Position, size and color from Gemini are still validated on all hero topics, while the hero renderers override the 3D visuals.
 
 ---
 
