@@ -15,7 +15,7 @@ from app.models.lesson import (
 from app.services.topics import HeroTopicSpec
 
 _HEX_PARSE_RE = re.compile(r"^#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$")
-_PAREN_ASCII_RE = re.compile(r"\([A-Za-z0-9\s.,/_+-]{1,60}\)")
+_PAREN_ASCII_RE = re.compile(r"[\(\[][A-Za-z0-9\s.,/_+-]{1,60}[\)\]]")
 
 
 def is_arabic_script_char(ch: str) -> bool:
@@ -80,6 +80,29 @@ def _normalize_id_candidate(raw: str) -> str:
     return raw.strip().lower().replace("-", "_").replace(" ", "_")
 
 
+def normalize_category_str(cat_raw: str | None) -> str | None:
+    if not cat_raw:
+        return None
+    cand = cat_raw.strip().lower().replace("-", "_").replace(" ", "_")
+    if cand in VALID_CATEGORIES:
+        return cand
+    if "earth" in cand:
+        return "earth_science"
+    if "geo" in cand:
+        return "geography"
+    if "bio" in cand:
+        return "biology"
+    if "phys" in cand:
+        return "physics"
+    if "chem" in cand:
+        return "chemistry"
+    if "astro" in cand or "space" in cand:
+        return "astronomy"
+    if "math" in cand:
+        return "math"
+    return None
+
+
 def validate_lesson_draft(
     draft: LessonDraft | None,
     hero_spec: HeroTopicSpec | None = None,
@@ -92,10 +115,14 @@ def validate_lesson_draft(
 
     if not draft.topic or not draft.topic.strip():
         errors.append("Lesson 'topic' is empty.")
-    if draft.category not in VALID_CATEGORIES:
+    
+    norm_cat = normalize_category_str(draft.category)
+    if norm_cat is None:
         errors.append(
             f"Invalid category '{draft.category}'. Must be one of {sorted(VALID_CATEGORIES)}."
         )
+    else:
+        draft.category = norm_cat
 
     _check_bilingual(draft.title, "title", errors)
     _check_bilingual(draft.summary, "summary", errors)
