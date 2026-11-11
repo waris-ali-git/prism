@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prism Dispersion Demo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Noto+Nastaliq+Urdu:wght@400;600&display=swap">
+<style>
+/* Embed: <iframe src="prism-demo.html?embed=1">. From parent: postMessage({prism:"angle",value:50},"*"), {prism:"glass",key:"flint"} (crown|flint|diamond|water),
+   {prism:"apex",value:60}, {prism:"boost",value:3}, {prism:"sweep",on:true} */
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#03040a;color:#fff;font-family:Manrope,system-ui,sans-serif;overflow:hidden}
+#stage{position:fixed;inset:0;background:radial-gradient(ellipse at 45% 50%,#101634 0%,#04050c 70%)}
+#view,#view canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.glass{position:absolute;background:rgba(12,16,36,.6);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:18px}
+#card{left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));width:min(520px,calc(100% - 28px));padding:14px 18px}
+#card h2{margin:0 0 2px;font-size:1.1rem}
+#card .ur{font-family:"Noto Nastaliq Urdu",serif;direction:rtl;text-align:right;font-size:1rem;line-height:2.1;margin:2px 0}
+#card p{margin:0;font-size:.82rem;color:#c9cfe6}
+#card .rd{margin-top:6px;font-size:.78rem;color:#9fb0ff;line-height:1.6}
+#ctl{top:max(14px,env(safe-area-inset-top));left:14px;padding:12px 14px;width:226px;display:grid;gap:7px;font-size:.78rem}
+#ctl label{display:flex;justify-content:space-between}
+#ctl input{width:100%;accent-color:#b79cff}
+.row{display:flex;gap:5px;flex-wrap:wrap}
+button.b{font:600 .72rem Manrope,sans-serif;flex:1;padding:5px 8px;border-radius:99px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;cursor:pointer;white-space:nowrap}
+button.b.on{background:#fff;color:#111}
+#spec{top:max(14px,env(safe-area-inset-top));right:14px;padding:10px 14px;width:min(250px,calc(100% - 270px));min-width:200px;font-size:.74rem}
+#sb{position:relative;height:22px;border-radius:8px;margin:6px 0 4px;cursor:crosshair;touch-action:none}
+#mk{position:absolute;top:-3px;bottom:-3px;width:3px;background:#fff;border-radius:2px;display:none;box-shadow:0 0 8px #fff}
+#msg{display:none;position:absolute;inset:0;align-items:center;justify-content:center;padding:24px;text-align:center;color:#cfd6f0}
+button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.embed #ctl,.embed #spec{display:none}
+@media (max-width:700px){#spec{top:auto;bottom:auto;right:14px;left:14px;width:auto;min-width:0;top:max(228px,calc(env(safe-area-inset-top) + 214px))}#ctl{width:200px}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="view"></div>
+  <div class="glass" id="ctl">
+    <label for="inc">Angle of incidence <output id="incO"></output></label><input id="inc" type="range" min="0" max="80" step=".5" value="52">
+    <label for="ap">Prism apex angle <output id="apO"></output></label><input id="ap" type="range" min="30" max="75" value="60">
+    <label for="bo">Dispersion boost <output id="boO"></output></label><input id="bo" type="range" min="1" max="8" step=".5" value="3">
+    <label for="br">Brightness <output id="brO"></output></label><input id="br" type="range" min="30" max="200" value="100">
+    <div class="row" id="gl"></div>
+    <div class="row"><button class="b" id="swB">Sweep angle</button></div>
+  </div>
+  <div class="glass" id="spec"><b>Pick a color</b> (tap the bar)<div id="sb"><div id="mk"></div></div><div class="row"><button class="b" id="allB">All colors</button></div></div>
+  <div class="glass" id="card"></div>
+  <div id="msg">3D needs WebGL, which is turned off on this device.</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const GL={crown:{n:"Crown glass",nd:1.517,k:.0042},flint:{n:"Dense flint",nd:1.728,k:.0134},diamond:{n:"Diamond",nd:2.417,k:.0135},water:{n:"Water",nd:1.333,k:.0031}};
+const $=id=>document.getElementById(id),V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
+if(/embed=1/.test(location.search))document.documentElement.classList.add("embed");
+const S={inc:52,ap:60,bo:3,br:1,g:"flint",sw:false,selJ:-1};
+const NW=40,WL=[...Array(NW)].map((_,i)=>400+i*300/(NW-1)),XS=12,FY=-6.5;
+function wrgb(nm){let r=0,g=0,b=0;if(nm<440){r=(440-nm)/60;b=1}else if(nm<490){g=(nm-440)/50;b=1}else if(nm<510){g=1;b=(510-nm)/20}else if(nm<580){r=(nm-510)/70;g=1}else if(nm<645){r=1;g=(645-nm)/65}else r=1;
+ const f=nm<420?.3+.7*(nm-380)/40:nm>700?.3+.7*(780-nm)/80:1;return[Math.pow(r*f,.8),Math.pow(g*f,.8),Math.pow(b*f,.8)]}
+const COL=WL.map(wrgb);
+$("sb").style.background="linear-gradient(90deg,"+COL.map((c,i)=>`rgb(${c.map(v=>Math.round(v*255))}) ${i/(NW-1)*100}%`).join(",")+")";
+// ---- physics (2D in the plane of the prism cross-section) ----
+const rot=(v,a)=>[v[0]*Math.cos(a)-v[1]*Math.sin(a),v[0]*Math.sin(a)+v[1]*Math.cos(a)],dot=(a,b)=>a[0]*b[0]+a[1]*b[1];
+function refract(I,N,e){const ci=-dot(I,N),s2=e*e*(1-ci*ci);if(s2>1)return null;const k=e*ci-Math.sqrt(1-s2);return[e*I[0]+k*N[0],e*I[1]+k*N[1]]}
+let E;function geom(){const A=S.ap*Math.PI/180,sa=Math.sin(A/2),ca=Math.cos(A/2),s=4,h=s*ca,BL=[-s*sa,0],BR=[s*sa,0],AP=[0,h];
+ const n1=[-ca,sa],M=[(BL[0]+AP[0])/2,h/2],d0=rot([-n1[0],-n1[1]],S.inc*Math.PI/180);
+ E={BL,BR,AP,n1,M,d0,edges:[[BL,n1],[AP,[ca,sa]],[BR,[0,-1]]],Sx:[M[0]-d0[0]*10,M[1]-d0[1]*10]}}
+function nOf(nm){const g=GL[S.g];return g.nd+S.bo*g.k*(1e6/(nm*nm)-1/.587/.587)}
+function trace(nm){const n=nOf(nm);let I=refract(E.d0,E.n1,1/n),P=E.M,ins=[],tir=0;
+ for(let b=0;b<5&&I;b++){let bt=1e9,be=null;for(const e of E.edges){const dn=dot(I,e[1]);if(dn>1e-6){const t=((e[0][0]-P[0])*e[1][0]+(e[0][1]-P[1])*e[1][1])/dn;if(t>1e-4&&t<bt){bt=t;be=e}}}
+  if(!be)break;const Q=[P[0]+I[0]*bt,P[1]+I[1]*bt];ins.push([P,Q]);const Ne=be[1],T=refract(I,[-Ne[0],-Ne[1]],n);
+  if(!T){const d=dot(I,Ne);I=[I[0]-2*d*Ne[0],I[1]-2*d*Ne[1]];P=Q;tir++;continue}
+  let hit=false,t=14;if(T[0]>1e-3){const tt=(XS-Q[0])/T[0];if(tt>0&&tt<60){t=tt;hit=true}}
+  return{n,ins,out:[Q,[Q[0]+T[0]*t,Q[1]+T[1]*t]],hit,y:Q[1]+T[1]*t,dev:Math.abs(Math.atan2(E.d0[0]*T[1]-E.d0[1]*T[0],dot(E.d0,T))*57.2958),tir}}
+ return{n,ins,out:null,hit:false,tir}}
+// ---- scene ----
+let renderer;try{renderer=new THREE.WebGLRenderer({antialias:true})}catch(e){$("msg").style.display="flex"}
+const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(40,16/9,.1,300);
+function gtex(w,h,f){const c=document.createElement("canvas");c.width=w;c.height=h;const g=c.getContext("2d");f(g,w,h);return new THREE.CanvasTexture(c)}
+if(renderer){
+ renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;renderer.outputEncoding=THREE.sRGBEncoding;
+ $("view").appendChild(renderer.domElement);scene.background=new THREE.Color(0x03040a);scene.fog=new THREE.FogExp2(0x03040a,.012);
+ // studio environment for glass reflections
+ const envS=new THREE.Scene(),eg=new THREE.SphereGeometry(30,24,16),ec=[];
+ for(let i=0;i<eg.attributes.position.count;i++){const t=eg.attributes.position.getY(i)/30*.5+.5;ec.push(.03+.12*t,.04+.16*t,.08+.3*t)}
+ eg.setAttribute("color",new THREE.Float32BufferAttribute(ec,3));envS.add(new THREE.Mesh(eg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide})));
+ [[12,14,8,10,6,3],[-14,6,-8,5,3,5],[0,-10,14,2,8,2],[16,-2,-10,4,2,6]].forEach(a=>{const p=new THREE.Mesh(new THREE.PlaneGeometry(a[4]+3,a[5]),new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));p.material.color.setScalar(a[3]);p.position.set(a[0],a[1],a[2]);p.lookAt(0,0,0);envS.add(p)});
+ scene.environment=new THREE.PMREMGenerator(renderer).fromScene(envS,.03).texture;
+ const kl=new THREE.DirectionalLight(0xdfe8ff,.6);kl.position.set(-6,10,12);scene.add(kl);scene.add(new THREE.AmbientLight(0x202840,.7));
+ // floor, post, prism
+ const fl=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x07080f,roughness:.35,metalness:.6}));fl.rotation.x=-Math.PI/2;fl.position.y=FY;scene.add(fl);
+ const metal=new THREE.MeshStandardMaterial({color:0x15181f,roughness:.3,metalness:.9});
+ const post=new THREE.Mesh(new THREE.CylinderGeometry(.5,.62,-FY,32),metal);post.position.y=FY/2;scene.add(post);
+ const cap=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,.12,48),metal);cap.position.y=-.06;scene.add(cap);
+ const gm=(side,op)=>new THREE.MeshPhysicalMaterial({color:0xd8ecff,roughness:.02,metalness:0,transparent:true,opacity:op,clearcoat:1,clearcoatRoughness:.02,envMapIntensity:2.2,side,depthWrite:false});
+ const pg=new THREE.Group();scene.add(pg);let pBack,pFront,pEdge;
+ function build(){pg.clear();const sh=new THREE.Shape();sh.moveTo(...E.BL);sh.lineTo(...E.BR);sh.lineTo(...E.AP);sh.closePath();
+  const g=new THREE.ExtrudeGeometry(sh,{depth:2.6,bevelEnabled:true,bevelSize:.04,bevelThickness:.04,bevelSegments:3});g.translate(0,0,-1.3);
+  pBack=new THREE.Mesh(g,gm(THREE.BackSide,.16));pFront=new THREE.Mesh(g,gm(THREE.FrontSide,.2));pBack.renderOrder=1;pFront.renderOrder=2;
+  pEdge=new THREE.LineSegments(new THREE.EdgesGeometry(g,30),new THREE.LineBasicMaterial({color:0xcfe4ff,transparent:true,opacity:.55}));pg.add(pBack,pFront,pEdge)}
+ // screen
+ const sc=document.createElement("canvas");sc.width=256;sc.height=640;const sx=sc.getContext("2d"),stx=new THREE.CanvasTexture(sc);stx.encoding=THREE.sRGBEncoding;
+ const scr=new THREE.Mesh(new THREE.PlaneGeometry(5,10),new THREE.MeshBasicMaterial({map:stx}));scr.rotation.y=-Math.PI/2;scr.position.set(XS+.02,-1.5,0);scene.add(scr);
+ const bez=new THREE.Mesh(new THREE.BoxGeometry(.2,10.4,5.4),metal);bez.position.set(XS+.15,-1.5,0);scene.add(bez);
+ // beams: two crossed instanced quads, additive, soft gaussian profile
+ const prof=gtex(8,64,(g,w,h)=>{for(let y=0;y<h;y++){const x=(y/(h-1)-.5)*2,a=Math.min(1,.8*Math.exp(-((x/.17)**2))+.3*Math.exp(-((x/.6)**2)))*Math.min(1,(1-Math.abs(x))*5);g.fillStyle=`rgba(255,255,255,${a})`;g.fillRect(0,y,w,1)}});
+ const bm=new THREE.MeshBasicMaterial({map:prof,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,toneMapped:false,fog:false}),CAP=215;
+ const IM=[0,1].map(()=>{const m=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1),bm,CAP);m.frustumCulled=false;m.renderOrder=5;scene.add(m);return m});
+ const D=new THREE.Object3D(),cc=new THREE.Color();let cnt=0;
+ function put(a,b,col,wd){if(cnt>=CAP)return;const ang=Math.atan2(b[1]-a[1],b[0]-a[0]),len=Math.hypot(b[0]-a[0],b[1]-a[1]);cc.setRGB(col[0],col[1],col[2]);
+  D.position.set((a[0]+b[0])/2,(a[1]+b[1])/2,0);D.scale.set(len,wd,1);
+  D.rotation.set(0,0,ang,"XYZ");D.updateMatrix();IM[0].setMatrixAt(cnt,D.matrix);IM[0].setColorAt(cnt,cc);
+  D.rotation.set(Math.PI/2,0,ang,"ZXY");D.updateMatrix();IM[1].setMatrixAt(cnt,D.matrix);IM[1].setColorAt(cnt,cc);cnt++}
+ const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:gtex(128,128,(g)=>{const r=g.createRadialGradient(64,64,0,64,64,64);r.addColorStop(0,"rgba(255,255,255,1)");r.addColorStop(.3,"rgba(200,220,255,.4)");r.addColorStop(1,"rgba(120,160,255,0)");g.fillStyle=r;g.fillRect(0,0,128,128)}),blending:THREE.AdditiveBlending,transparent:true,depthWrite:false,fog:false}));scene.add(glow);
+ const lamp=new THREE.Mesh(new THREE.CylinderGeometry(.34,.42,1.5,28),metal),lpost=new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,1,12),metal);scene.add(lamp,lpost);
+ // dust motes
+ const MN=180,mp=new Float32Array(MN*3),mb=[];for(let i=0;i<MN;i++){mb.push([-12+Math.random()*26,-5+Math.random()*9,-5+Math.random()*10,Math.random()*6])}
+ const mg=new THREE.BufferGeometry();mg.setAttribute("position",new THREE.BufferAttribute(mp,3));
+ scene.add(new THREE.Points(mg,new THREE.PointsMaterial({size:.07,color:0xbfd0ff,transparent:true,opacity:.35,depthWrite:false})));
+ // ---- recompute everything ----
+ function recalc(){geom();build();cnt=0;const bright=S.br,res=[];
+  const hit=[E.Sx,E.M];put(E.Sx,E.M,[bright,bright,bright],.5);
+  {const n=GL[S.g].nd,ci=-dot(E.d0,E.n1),st=Math.sqrt(1-ci*ci)/n,ct=Math.sqrt(1-st*st),rs=((ci-n*ct)/(ci+n*ct))**2,rp=((n*ci-ct)/(n*ci+ct))**2,R=(rs+rp)/2,d=dot(E.d0,E.n1),r=[E.d0[0]-2*d*E.n1[0],E.d0[1]-2*d*E.n1[1]];
+   put(E.M,[E.M[0]+r[0]*9,E.M[1]+r[1]*9],[R*bright*5,R*bright*5,R*bright*5],.3)}
+  sx.fillStyle="#0b0d14";sx.fillRect(0,0,256,640);sx.globalCompositeOperation="lighter";
+  WL.forEach((nm,j)=>{const t=trace(nm);res.push(t);const f=S.selJ<0?1:j===S.selJ?3.4:.1,c=COL[j].map(v=>v*.085*bright*f);
+   t.ins.forEach(s=>put(s[0],s[1],c,.34));if(t.out)put(t.out[0],t.out[1],c,.34);
+   if(t.hit&&t.y>-6.5&&t.y<3.5){const cy=(3.5-t.y)/10*640,a=Math.min(1,.1*bright*f);sx.save();sx.translate(128,cy);sx.scale(1,.3);const g=sx.createRadialGradient(0,0,0,0,0,64);g.addColorStop(0,`rgba(${c.map(v=>Math.round(Math.min(1,v*9)*255)).join(",")},${a*3})`);g.addColorStop(1,"rgba(0,0,0,0)");sx.fillStyle=g;sx.fillRect(-64,-64,128,128);sx.restore()}});
+  sx.globalCompositeOperation="source-over";stx.needsUpdate=true;
+  D.scale.set(0,0,0);D.updateMatrix();for(let i=cnt;i<CAP;i++){IM[0].setMatrixAt(i,D.matrix);IM[1].setMatrixAt(i,D.matrix)}
+  IM.forEach(m=>{m.instanceMatrix.needsUpdate=true;m.instanceColor.needsUpdate=true});
+  glow.position.set(E.M[0],E.M[1],0);glow.scale.setScalar(1.3+bright*.5);
+  const a0=Math.atan2(E.d0[1],E.d0[0]);lamp.rotation.z=a0-Math.PI/2;lamp.position.set(E.Sx[0]-E.d0[0]*.75,E.Sx[1]-E.d0[1]*.75,0);
+  const ly=E.Sx[1]-.5;lpost.scale.y=ly-FY;lpost.position.set(E.Sx[0]-E.d0[0]*.75,FY+(ly-FY)/2,0);
+  readout(res)}
+ window.recalc=recalc;
+ // ---- UI ----
+ function readout(res){const r=res[NW-1],v=res[0],g=GL[S.g],sel=S.selJ>=0?res[S.selJ]:null;let t=`${g.n} Â· n â‰ˆ ${r.n.toFixed(3)} (red 700 nm) to ${v.n.toFixed(3)} (violet 400 nm)`;
+  if(r.out&&v.out)t+=`<br>Deviation: red ${r.dev.toFixed(1)}Â° Â· violet ${v.dev.toFixed(1)}Â° Â· spread ${Math.abs(v.dev-r.dev).toFixed(1)}Â°`;else t+=`<br>Total internal reflection: no light exits on one side.`;
+  if(r.tir||v.tir)t+=`<br>Some colors are totally internally reflected inside the glass.`;
+  if(sel&&sel.out)t+=`<br><b>${Math.round(WL[S.selJ])} nm</b>: n = ${sel.n.toFixed(3)} Â· deviation ${sel.dev.toFixed(1)}Â°`;
+  $("rd").innerHTML=t}
+ $("card").innerHTML=`<h2>Dispersion of white light</h2><div class="ur" lang="ur">Ø¬Ø¨ Ø³ÙÛŒØ¯ Ø±ÙˆØ´Ù†ÛŒ Ù¾Ø±Ø²Ù… Ø³Û’ Ú¯Ø²Ø±ØªÛŒ ÛÛ’ ØªÙˆ ÛØ± Ø±Ù†Ú¯ Ø§Ù„Ú¯ Ø²Ø§ÙˆÛŒÛ’ Ù¾Ø± Ù…Ú‘ØªØ§ ÛÛ’ØŒ Ú©ÛŒÙˆÙ†Ú©Û Ø´ÛŒØ´Û’ Ù…ÛŒÚº ÛØ± Ø±Ù†Ú¯ Ú©Ø§ Ø§Ù†Ø¹Ø·Ø§Ù Ú©Ø§ Ø§Ø´Ø§Ø±ÛŒÛ ØªÚ¾ÙˆÚ‘Ø§ Ù…Ø®ØªÙ„Ù ÛÙˆØªØ§ ÛÛ’Û” Ø¨Ù†ÙØ´ÛŒ Ø³Ø¨ Ø³Û’ Ø²ÛŒØ§Ø¯Û Ø§ÙˆØ± Ø³Ø±Ø® Ø³Ø¨ Ø³Û’ Ú©Ù… Ù…Ú‘ØªØ§ ÛÛ’Û”</div><p>Each color bends by a different amount because glass has a slightly different refractive index for each wavelength. Violet bends most, red least. At steep angles, light can be totally internally reflected.</p><div class="rd" id="rd"></div>`;
+ const bind=(id,k,fmt,sc)=>{const e=$(id),f=()=>{S[k]=+e.value*(sc||1);$(id+"O").textContent=fmt(+e.value);recalc()};e.oninput=f;return()=>{$(id+"O").textContent=fmt(+e.value)}};
+ const setters={inc:bind("inc","inc",v=>v+"Â°"),ap:bind("ap","ap",v=>v+"Â°"),bo:bind("bo","bo",v=>v+"Ã—"),br:bind("br","br",v=>v+"%",.01)};
+ Object.values(setters).forEach(f=>f());
+ Object.keys(GL).forEach(k=>{const b=document.createElement("button");b.className="b"+(k===S.g?" on":"");b.textContent=GL[k].n.split(" ")[0];b.dataset.k=k;b.onclick=()=>setGlass(k);$("gl").appendChild(b)});
+ function setGlass(k){if(!GL[k])return;S.g=k;document.querySelectorAll("#gl .b").forEach(b=>b.classList.toggle("on",b.dataset.k===k));recalc()}
+ function setSweep(on){S.sw=on;$("swB").classList.toggle("on",on)}
+ $("swB").onclick=()=>setSweep(!S.sw);
+ function pickWL(e){const r=$("sb").getBoundingClientRect(),f=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),j=Math.round(f*(NW-1));S.selJ=j;$("mk").style.display="block";$("mk").style.left=f*100+"%";recalc()}
+ let sd=false;$("sb").onpointerdown=e=>{sd=true;$("sb").setPointerCapture(e.pointerId);pickWL(e)};$("sb").onpointermove=e=>{if(sd)pickWL(e)};$("sb").onpointerup=()=>sd=false;
+ $("allB").onclick=()=>{S.selJ=-1;$("mk").style.display="none";recalc()};
+ addEventListener("message",e=>{const d=e.data||{};if(d.prism==="angle"){$("inc").value=d.value;S.inc=+d.value;setters.inc();recalc()}else if(d.prism==="apex"){$("ap").value=d.value;S.ap=+d.value;setters.ap();recalc()}else if(d.prism==="boost"){$("bo").value=d.value;S.bo=+d.value;setters.bo();recalc()}else if(d.prism==="glass")setGlass(d.key);else if(d.prism==="sweep")setSweep(!!d.on)});
+ // ---- camera ----
+ let th=-.55,ph=1.3,R0=36,rad=36,drag=null,T=0,last=0;const tgt=V(3,-1.2,0),el=renderer.domElement,pts=new Map();
+ function size(){const w=$("view").clientWidth,h=$("view").clientHeight;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();R0=w/h<1?60:36}
+ addEventListener("resize",size);size();rad=R0;
+ el.addEventListener("pointerdown",e=>{el.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});el.style.cursor="grabbing"});
+ el.addEventListener("pointermove",e=>{if(!pts.has(e.pointerId))return;const p=pts.get(e.pointerId);
+  if(pts.size===2){const o=[...pts.entries()].find(([k])=>k!==e.pointerId)[1];R0=Math.min(80,Math.max(10,R0*Math.hypot(p.x-o.x,p.y-o.y)/Math.hypot(e.clientX-o.x,e.clientY-o.y)))}
+  else{th-=(e.clientX-p.x)*.005;ph=Math.min(2.4,Math.max(.5,ph-(e.clientY-p.y)*.005))}pts.set(e.pointerId,{x:e.clientX,y:e.clientY})});
+ const up=e=>{pts.delete(e.pointerId);el.style.cursor="grab"};el.addEventListener("pointerup",up);el.addEventListener("pointercancel",up);
+ el.addEventListener("wheel",e=>{e.preventDefault();R0=Math.min(80,Math.max(10,R0*(1+e.deltaY*.001)))},{passive:false});
+ recalc();
+ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,(t-last)/1000||.016);last=t;T+=dt;
+  if(S.sw&&!reduce){S.inc=55+20*Math.sin(T*.35);$("inc").value=S.inc;$("incO").textContent=S.inc.toFixed(0)+"Â°";recalc()}
+  for(let i=0;i<MN;i++){const b=mb[i];mp[i*3]=b[0]+Math.sin(T*.2+b[3])*.6;mp[i*3+1]=b[1]+Math.sin(T*.3+b[3]*2)*.4;mp[i*3+2]=b[2]+Math.cos(T*.25+b[3])*.5}mg.attributes.position.needsUpdate=true;
+  rad+=(R0-rad)*.08;cam.position.set(tgt.x+rad*Math.sin(ph)*Math.sin(th),tgt.y+rad*Math.cos(ph),tgt.z+rad*Math.sin(ph)*Math.cos(th));cam.lookAt(tgt);
+  renderer.render(scene,cam)}
+ requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

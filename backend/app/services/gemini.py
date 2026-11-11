@@ -319,6 +319,7 @@ class GeminiService:
                 status=502,
             ) from exc
         if isinstance(exc, genai_errors.APIError):
+            logger.error(f"gemini_api_error code={getattr(exc, 'code', None)} msg={getattr(exc, 'message', str(exc))}")
             if exc.code == 429:
                 retry_after = _extract_retry_seconds(exc)
                 raise AppError(

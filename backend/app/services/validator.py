@@ -169,13 +169,14 @@ def validate_lesson_draft(
             )
         if not _is_finite_vec3(part.position):
             errors.append(f"{prefix}.position must be 3 finite numbers [x, y, z].")
-        if (
-            part.size is None
-            or not isinstance(part.size, (int, float))
-            or not math.isfinite(float(part.size))
-            or float(part.size) <= 0
-        ):
-            errors.append(f"{prefix}.size must be a positive number.")
+        try:
+            val = float(part.size) if part.size is not None else 1.0
+            if not math.isfinite(val) or val <= 0:
+                part.size = 1.0
+            else:
+                part.size = max(0.05, min(4.0, val))
+        except (ValueError, TypeError):
+            part.size = 1.0
 
         if part.stretch is not None and not _is_finite_vec3(part.stretch):
             errors.append(f"{prefix}.stretch must be 3 finite numbers [x, y, z].")

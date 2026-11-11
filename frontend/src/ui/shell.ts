@@ -7,6 +7,7 @@ import {
 } from '../api/client';
 import { revokePreviewUrl } from '../api/image';
 import type { ImageMimeType, Lesson } from '../api/types';
+import { getHeroLessonIfMatch } from '../app/heroLessons';
 import { COPY, getErrorCopy, t } from '../app/i18n';
 import { navigateTo, onRouteChange } from '../app/router';
 import { store, type AppState } from '../app/store';
@@ -26,6 +27,7 @@ export class AppShell {
   private scrollProgressEl: HTMLElement;
   private stageContainer: HTMLElement;
   private labelLayer: HTMLElement;
+  private solarContainer: HTMLElement;
   private topBarSlot: HTMLElement;
   private viewSlot: HTMLElement;
   private photoModalSlot: HTMLElement;
@@ -68,6 +70,10 @@ export class AppShell {
       'fixed inset-0 z-10 pointer-events-none overflow-hidden';
     this.labelLayer.style.display = 'none';
 
+    this.solarContainer = document.createElement('div');
+    this.solarContainer.className =
+      'fixed inset-0 z-0 bg-[#02030a] hidden';
+
     this.topBarSlot = document.createElement('div');
     this.viewSlot = document.createElement('div');
     this.viewSlot.className = 'relative z-20';
@@ -86,6 +92,7 @@ export class AppShell {
       this.scrollSequence.element,
       this.scrollProgressEl,
       this.stageContainer,
+      this.solarContainer,
       this.labelLayer,
       this.topBarSlot,
       this.viewSlot,
@@ -261,9 +268,39 @@ export class AppShell {
       (state.explorerState === 'ready' || state.explorerState === 'loading');
     document.body.classList.toggle('workspace-locked', lockWorkspace);
     this.scrollSequence.setVisible(!lockWorkspace);
-    this.stageContainer.style.visibility = lockWorkspace ? 'visible' : 'hidden';
-    this.lessonStage?.setActive(lockWorkspace);
-    if (!lockWorkspace) this.labelLayer.style.display = 'none';
+
+    const isSolarSystem =
+      state.route === '/' &&
+      state.explorerState === 'ready' &&
+      state.lesson?.topicKey === 'solar-system';
+
+    const isPrismDemo =
+      state.route === '/' &&
+      state.explorerState === 'ready' &&
+      state.lesson?.topicKey === 'light-prism';
+
+    if (isSolarSystem || isPrismDemo) {
+      this.solarContainer.classList.remove('hidden');
+      this.solarContainer.style.display = 'block';
+      this.stageContainer.style.display = 'none';
+      this.labelLayer.style.display = 'none';
+      const iframeSrc = isSolarSystem
+        ? '/solar-system-demo.html'
+        : '/prism-demo.html';
+      const iframeId = isSolarSystem ? 'solar-iframe' : 'prism-iframe';
+      const existingIframe = this.solarContainer.querySelector('iframe');
+      if (!existingIframe || existingIframe.id !== iframeId) {
+        this.solarContainer.innerHTML = `<iframe id="${iframeId}" src="${iframeSrc}" class="w-full h-full border-0 absolute inset-0 pointer-events-auto" allow="fullscreen"></iframe>`;
+      }
+    } else {
+      this.solarContainer.classList.add('hidden');
+      this.solarContainer.style.display = 'none';
+      this.solarContainer.innerHTML = '';
+      this.stageContainer.style.display = lockWorkspace ? 'block' : 'none';
+      this.stageContainer.style.visibility = lockWorkspace ? 'visible' : 'hidden';
+      this.lessonStage?.setActive(lockWorkspace);
+      if (!lockWorkspace) this.labelLayer.style.display = 'none';
+    }
 
     // Stage interactivity only in ready state
     const interactiveStage =
@@ -622,6 +659,14 @@ export class AppShell {
 
     this.viewSlot.append(controlsWrap, sidePanel, this.bottomSheet.element);
 
+    if (
+      lesson.topicKey === 'solar-system' ||
+      lesson.topicKey === 'light-prism'
+    ) {
+      sidePanel.style.display = 'none';
+      this.bottomSheet.element.style.display = 'none';
+    }
+
     window.requestAnimationFrame(() => {
       this.bottomSheet?.setSnap(state.sheetSnap, true);
     });
@@ -659,13 +704,17 @@ export class AppShell {
         this.stage.resetView();
       });
 
+      if (
+        lesson.topicKey === 'solar-system' ||
+        lesson.topicKey === 'light-prism'
+      ) {
+        this.stageActionCluster.appendChild(newBtn);
+        return;
+      }
+
       this.stageActionCluster.append(newBtn, resetBtn);
 
-      if (
-        lesson.topicKey === 'human-cell' ||
-        lesson.topicKey === 'light-prism' ||
-        lesson.topicKey === 'solar-system'
-      ) {
+      if (lesson.topicKey === 'human-cell') {
         const insideBtn = document.createElement('button');
         insideBtn.type = 'button';
         insideBtn.className = `btn-primary text-xs sm:text-sm ${
@@ -738,7 +787,11 @@ export class AppShell {
 
   private returnToIdle(): void {
     this.cancelActiveRequest();
-    this.stage.disposeLessonObjects();
+    this.lessonStage?.disposeLessonObjects();
+    this.solarContainer.classList.add('hidden');
+    this.solarContainer.style.display = 'none';
+    this.solarContainer.innerHTML = '';
+    this.stageContainer.style.display = 'block';
     store.setState({
       explorerState: 'idle',
       errorCode: null,
@@ -795,6 +848,22 @@ export class AppShell {
     store.setState({
       lastSubmission: { kind: 'topic', topic: cleaned },
     });
+
+    const heroLesson = getHeroLessonIfMatch(cleaned);
+    if (heroLesson) {
+      // Natural museum loading choreography delay (~1300ms) requested by user
+      window.setTimeout(() => {
+        if (controller.signal.aborted) return;
+        this.activateLoadedLesson(heroLesson, {
+          cached: true,
+          model: 'canonical-hero',
+          generatedAt: new Date().toISOString(),
+          source: 'text',
+          requestId: 'hero-' + Date.now().toString(36),
+        });
+      }, 1300);
+      return;
+    }
 
     try {
       const response = await createLessonFromTopic(cleaned, controller.signal);

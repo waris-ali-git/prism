@@ -24,6 +24,16 @@ export class ScrollSequence {
   constructor() {
     this.element.className = 'scroll-sequence';
     this.element.setAttribute('aria-hidden', 'true');
+    // Show the first image immediately while Canvas frames decode.
+    const firstUrl = frameUrls[0];
+    if (firstUrl) {
+      const poster = document.createElement('img');
+      poster.className = 'scroll-sequence__poster';
+      poster.alt = '';
+      poster.fetchPriority = 'high';
+      poster.src = firstUrl;
+      this.element.append(poster);
+    }
     this.canvas.className = 'scroll-sequence__canvas';
     this.element.append(this.canvas);
     this.context = this.canvas.getContext('2d', { alpha: false });
@@ -65,7 +75,9 @@ export class ScrollSequence {
       await image.decode();
       if (this.disposed) return;
       this.frames.set(index, image);
-      if (this.drawnFrame === null || index === this.targetFrame) this.requestDraw();
+      if (this.drawnFrame === null || Math.abs(index - this.targetFrame) <= 1) {
+        this.requestDraw();
+      }
     } catch {
       // Keep the last valid frame (or the white page) if one image fails.
     }
@@ -102,7 +114,10 @@ export class ScrollSequence {
     this.rafId = 0;
     const context = this.context;
     if (!context || this.disposed || !this.visible || document.hidden) return;
-    const target = this.targetFrame;
+    const position = this.reducedMotion.matches
+      ? 0
+      : this.progress * Math.max(0, frameUrls.length - 1);
+    const target = Math.floor(position);
     const index = this.frames.has(target)
       ? target
       : this.drawnFrame ?? this.frames.keys().next().value;
@@ -129,6 +144,14 @@ export class ScrollSequence {
     const drawnHeight = image.naturalHeight * scale;
     context.drawImage(image, (width - drawnWidth) / 2, (height - drawnHeight) / 2,
       drawnWidth, drawnHeight);
+    // Blend adjacent source frames using scroll position, never elapsed time.
+    const nextImage = this.frames.get(target + 1);
+    if (index === target && nextImage && position > target) {
+      context.globalAlpha = position - target;
+      context.drawImage(nextImage, (width - drawnWidth) / 2, (height - drawnHeight) / 2,
+        drawnWidth, drawnHeight);
+      context.globalAlpha = 1;
+    }
     this.drawnFrame = index;
     this.canvas.dataset.frame = String(index + 1);
   };
